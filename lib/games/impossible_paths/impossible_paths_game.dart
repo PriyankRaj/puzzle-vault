@@ -19,6 +19,10 @@ final GameDefinition impossiblePathsDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF34D399), Color(0xFF047857)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap a tile to rotate it 90°. Connect open sides from the green start '
+      'tile all the way to the amber goal tile to complete the level — '
+      'fewer taps earns more stars.',
   builder: (context, ctx) => ImpossiblePathsScreen(ctx: ctx),
 );
 
@@ -172,21 +176,117 @@ _LevelSpec _makeLevel({
 /// connected chain from start to goal at rotation-0-relative-to-solved for
 /// every tile — hand-traced for levels 1 and 15 while authoring.
 final List<_LevelSpec> _levels = [
-  _makeLevel(rows: 4, cols: 4, coveredRows: 3, lastRowSteps: 0, upgradeCount: 0),
-  _makeLevel(rows: 4, cols: 4, coveredRows: 3, lastRowSteps: 2, upgradeCount: 1),
-  _makeLevel(rows: 4, cols: 4, coveredRows: 4, lastRowSteps: 0, upgradeCount: 1),
-  _makeLevel(rows: 4, cols: 5, coveredRows: 3, lastRowSteps: 2, upgradeCount: 1),
-  _makeLevel(rows: 4, cols: 5, coveredRows: 4, lastRowSteps: 1, upgradeCount: 2),
-  _makeLevel(rows: 5, cols: 5, coveredRows: 4, lastRowSteps: 2, upgradeCount: 2),
-  _makeLevel(rows: 5, cols: 5, coveredRows: 5, lastRowSteps: 1, upgradeCount: 2),
-  _makeLevel(rows: 5, cols: 6, coveredRows: 4, lastRowSteps: 3, upgradeCount: 3),
-  _makeLevel(rows: 5, cols: 6, coveredRows: 5, lastRowSteps: 2, upgradeCount: 3),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 5, lastRowSteps: 3, upgradeCount: 3, crossCount: 1),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 6, lastRowSteps: 1, upgradeCount: 4, crossCount: 1),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 6, lastRowSteps: 3, upgradeCount: 4, crossCount: 1),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 6, lastRowSteps: 5, upgradeCount: 5, crossCount: 1),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 6, lastRowSteps: 5, upgradeCount: 5, crossCount: 2),
-  _makeLevel(rows: 6, cols: 6, coveredRows: 6, lastRowSteps: 5, upgradeCount: 6, crossCount: 2),
+  _makeLevel(
+    rows: 4,
+    cols: 4,
+    coveredRows: 3,
+    lastRowSteps: 0,
+    upgradeCount: 0,
+  ),
+  _makeLevel(
+    rows: 4,
+    cols: 4,
+    coveredRows: 3,
+    lastRowSteps: 2,
+    upgradeCount: 1,
+  ),
+  _makeLevel(
+    rows: 4,
+    cols: 4,
+    coveredRows: 4,
+    lastRowSteps: 0,
+    upgradeCount: 1,
+  ),
+  _makeLevel(
+    rows: 4,
+    cols: 5,
+    coveredRows: 3,
+    lastRowSteps: 2,
+    upgradeCount: 1,
+  ),
+  _makeLevel(
+    rows: 4,
+    cols: 5,
+    coveredRows: 4,
+    lastRowSteps: 1,
+    upgradeCount: 2,
+  ),
+  _makeLevel(
+    rows: 5,
+    cols: 5,
+    coveredRows: 4,
+    lastRowSteps: 2,
+    upgradeCount: 2,
+  ),
+  _makeLevel(
+    rows: 5,
+    cols: 5,
+    coveredRows: 5,
+    lastRowSteps: 1,
+    upgradeCount: 2,
+  ),
+  _makeLevel(
+    rows: 5,
+    cols: 6,
+    coveredRows: 4,
+    lastRowSteps: 3,
+    upgradeCount: 3,
+  ),
+  _makeLevel(
+    rows: 5,
+    cols: 6,
+    coveredRows: 5,
+    lastRowSteps: 2,
+    upgradeCount: 3,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 5,
+    lastRowSteps: 3,
+    upgradeCount: 3,
+    crossCount: 1,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 6,
+    lastRowSteps: 1,
+    upgradeCount: 4,
+    crossCount: 1,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 6,
+    lastRowSteps: 3,
+    upgradeCount: 4,
+    crossCount: 1,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 6,
+    lastRowSteps: 5,
+    upgradeCount: 5,
+    crossCount: 1,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 6,
+    lastRowSteps: 5,
+    upgradeCount: 5,
+    crossCount: 2,
+  ),
+  _makeLevel(
+    rows: 6,
+    cols: 6,
+    coveredRows: 6,
+    lastRowSteps: 5,
+    upgradeCount: 6,
+    crossCount: 2,
+  ),
 ];
 
 class ImpossiblePathsScreen extends StatefulWidget {
@@ -225,7 +325,9 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
       final pos = _spec.path[i];
       final dirs = <_Dir>{};
       if (i > 0) dirs.add(_dirBetween(pos, _spec.path[i - 1]));
-      if (i < _spec.path.length - 1) dirs.add(_dirBetween(pos, _spec.path[i + 1]));
+      if (i < _spec.path.length - 1) {
+        dirs.add(_dirBetween(pos, _spec.path[i + 1]));
+      }
 
       _Shape shape;
       if (i == 0) {
@@ -235,7 +337,9 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
       } else {
         final extra = _spec.upgrades[i];
         if (extra != null) {
-          final remaining = _Dir.values.where((d) => !dirs.contains(d)).toList();
+          final remaining = _Dir.values
+              .where((d) => !dirs.contains(d))
+              .toList();
           for (var k = 0; k < extra && k < remaining.length; k++) {
             dirs.add(remaining[k]);
           }
@@ -245,7 +349,8 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
         } else if (dirs.length == 3) {
           shape = _Shape.tee;
         } else {
-          final opposite = (dirs.contains(_Dir.n) && dirs.contains(_Dir.s)) ||
+          final opposite =
+              (dirs.contains(_Dir.n) && dirs.contains(_Dir.s)) ||
               (dirs.contains(_Dir.e) && dirs.contains(_Dir.w));
           shape = opposite ? _Shape.straight : _Shape.corner;
         }
@@ -274,7 +379,8 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
     }
   }
 
-  bool _inBounds(int r, int c) => r >= 0 && r < _spec.rows && c >= 0 && c < _spec.cols;
+  bool _inBounds(int r, int c) =>
+      r >= 0 && r < _spec.rows && c >= 0 && c < _spec.cols;
 
   void _recomputeConnectivity() {
     final visited = <(int, int)>{_startPos};
@@ -334,10 +440,7 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
-          TextButton(
-            onPressed: widget.ctx.onExit,
-            child: const Text('Menu'),
-          ),
+          TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
       body: Column(
@@ -347,7 +450,10 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Taps: $_taps', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Taps: $_taps',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Text(
                   solved ? 'Connected!' : 'Not connected',
                   style: TextStyle(
@@ -447,7 +553,9 @@ class _TilePainter extends CustomPainter {
     }
 
     if (shape == _Shape.start || shape == _Shape.goal) {
-      final markerColor = shape == _Shape.start ? AppTheme.success : AppTheme.warning;
+      final markerColor = shape == _Shape.start
+          ? AppTheme.success
+          : AppTheme.warning;
       canvas.drawCircle(
         center,
         size.shortestSide * 0.22,

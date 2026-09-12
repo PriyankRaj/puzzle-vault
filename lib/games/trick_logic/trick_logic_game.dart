@@ -16,6 +16,11 @@ final GameDefinition trickLogicDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFFACC15), Color(0xFFA16207)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Each level gives you a short instruction and a simple-looking '
+      'control. Read the instruction word-for-word — the obvious action '
+      'is usually a trap, and the real solution only appears if you '
+      'follow the wording exactly.',
   builder: (context, ctx) => TrickLogicScreen(ctx: ctx),
 );
 
@@ -133,7 +138,9 @@ Widget _level1(BuildContext context, VoidCallback onSolved) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _instructionCard('Tap the button whose LABEL reads "GO". Ignore its color.'),
+      _instructionCard(
+        'Tap the button whose LABEL reads "GO". Ignore its color.',
+      ),
       const SizedBox(height: 40),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -353,8 +360,9 @@ class _Level5State extends State<_Level5> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _tapped.contains(n) ? AppTheme.success : null,
+                    backgroundColor: _tapped.contains(n)
+                        ? AppTheme.success
+                        : null,
                   ),
                   onPressed: () => _tap(context, n),
                   child: Text('$n'),
@@ -379,7 +387,8 @@ Widget _level6(BuildContext context, VoidCallback onSolved) {
       const SizedBox(height: 40),
       Center(
         child: GestureDetector(
-          onTap: () => _hint(context, 'Nothing happens... try holding it down.'),
+          onTap: () =>
+              _hint(context, 'Nothing happens... try holding it down.'),
           onLongPress: onSolved,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
@@ -631,7 +640,9 @@ class _Level10State extends State<_Level10> {
                   height: 90,
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: _accepting ? AppTheme.success : AppTheme.textSecondary,
+                      color: _accepting
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(12),
@@ -769,7 +780,10 @@ class _Level13State extends State<_Level13> {
     if (_switchLabelledOff && !_switchLabelledOn) {
       widget.onSolved();
     } else {
-      _hint(context, "Both switches currently match their own labels — that's wrong.");
+      _hint(
+        context,
+        "Both switches currently match their own labels — that's wrong.",
+      );
     }
   }
 
@@ -834,8 +848,11 @@ class _Level14State extends State<_Level14> {
   static const _sentence = 'Owls glide quietly above the moonlit valley.';
   final _controller = TextEditingController();
 
-  int get _vowelCount =>
-      _sentence.toLowerCase().split('').where((c) => 'aeiou'.contains(c)).length;
+  int get _vowelCount => _sentence
+      .toLowerCase()
+      .split('')
+      .where((c) => 'aeiou'.contains(c))
+      .length;
 
   void _submit(BuildContext context) {
     if (int.tryParse(_controller.text.trim()) == _vowelCount) {

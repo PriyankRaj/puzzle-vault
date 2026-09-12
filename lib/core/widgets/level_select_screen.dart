@@ -6,6 +6,7 @@ import '../progress_store.dart';
 import '../settings_store.dart';
 import '../sound.dart';
 import 'game_host.dart';
+import 'info_tip_button.dart';
 
 class LevelSelectScreen extends StatefulWidget {
   const LevelSelectScreen({super.key, required this.def});
@@ -17,6 +18,44 @@ class LevelSelectScreen extends StatefulWidget {
 }
 
 class _LevelSelectScreenState extends State<LevelSelectScreen> {
+  Future<void> _confirmReset(BuildContext context) async {
+    final def = widget.def;
+    Sfx.tap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Reset ${def.title}?'),
+          content: const Text(
+            'This clears unlocked levels and stars for this game only. '
+            'This cannot be undone.',
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await ProgressStore.instance.resetGame(def.id);
+    Sfx.success();
+    if (!context.mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${def.title} progress has been reset')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final def = widget.def;
@@ -27,7 +66,17 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
       valueListenable: AppSettingsStore.instance.isDarkMode,
       builder: (context, _, _) {
         return Scaffold(
-          appBar: AppBar(title: Text(def.title)),
+          appBar: AppBar(
+            title: Text(def.title),
+            actions: [
+              InfoTipButton(title: def.title, helpText: def.helpText),
+              IconButton(
+                icon: const Icon(Icons.restart_alt_rounded),
+                tooltip: 'Reset progress',
+                onPressed: () => _confirmReset(context),
+              ),
+            ],
+          ),
           body: Padding(
             padding: const EdgeInsets.all(20),
             child: GridView.builder(
@@ -53,7 +102,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                           Sfx.tap();
                           await Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => GameHost(def: def, initialLevel: level),
+                              builder: (_) =>
+                                  GameHost(def: def, initialLevel: level),
                             ),
                           );
                           if (mounted) setState(() {});
@@ -97,7 +147,11 @@ class _LevelTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (locked)
-                Icon(Icons.lock_rounded, color: AppTheme.textSecondary, size: 22)
+                Icon(
+                  Icons.lock_rounded,
+                  color: AppTheme.textSecondary,
+                  size: 22,
+                )
               else
                 Text(
                   '$level',

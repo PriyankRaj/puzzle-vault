@@ -21,6 +21,7 @@ lib/
       game_host.dart          GameHost (wraps every game screen)
       level_select_screen.dart
       result_dialog.dart      showLevelCompleteDialog / showLevelFailedDialog
+      info_tip_button.dart    InfoTipButton ("How to play" ⓘ dialog)
   games/<game_id>/<game_id>_game.dart   one file per game
   home/home_screen.dart
   settings/settings_screen.dart
@@ -40,6 +41,7 @@ GameDefinition(
   tint: GameTint(...),
   mode: GameMode.levels,     // or GameMode.endless
   levelCount: 15,            // capped at 15 by product requirement
+  helpText: 'Tap any tile to flip it and its neighbours...',
   builder: (context, ctx) => LightsOutScreen(ctx: ctx),
 )
 ```
@@ -118,11 +120,44 @@ all three, plus a "Reset all progress" action that shows a confirmation
   `AppSettingsStore.instance.soundEnabled`. See "Sound is intentionally thin"
   in `CONTEXT.md` for why this isn't real synthesized audio.
 
+## How-to-play info tips
+
+Every `GameDefinition` has a required `helpText` string. It's surfaced via
+`InfoTipButton` (`lib/core/widgets/info_tip_button.dart`), an ⓘ icon-button
+that shows an `AlertDialog` with the game's title and `helpText`. Rather than
+adding this button to all 20 individual game screens, it's wired in exactly
+two places:
+
+- `LevelSelectScreen`'s AppBar — covers all 18 `GameMode.levels` games in one
+  place, since they all route through that screen before `GameHost`.
+- The two `GameMode.endless` games' own AppBars (`merge2048_game.dart`,
+  `merge_threes_game.dart`), since they skip level-select entirely and go
+  straight to `GameHost`.
+
+If you add a 21st game, only add `helpText` to its `GameDefinition` — the
+button placement is automatic for `GameMode.levels` games, and only needs a
+manual `InfoTipButton` if you add another `GameMode.endless` game.
+
 ## Persistence
 
 `ProgressStore` (`lib/core/progress_store.dart`) is a `SharedPreferences`-backed
 singleton keyed by game id + level, storing completion and star count.
-`resetAll(gameIds)` iterates and clears every registered game.
+`resetGame(gameId)` clears one game; `resetAll(gameIds)` iterates and calls
+it for every registered game. Settings > "Reset all progress" uses
+`resetAll`; each game's own "Reset progress" action (ⓘ button's neighbour —
+on `LevelSelectScreen`'s AppBar for the 18 level-based games, or directly in
+the two endless games' own AppBars) uses `resetGame` scoped to just that
+game's id.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push/PR: `dart format
+--set-exit-if-changed .`, `flutter analyze`, `flutter test`, then (in a
+second job, gated on the first passing) a debug APK build. This is the
+automated version of the "Verifying changes" steps in `README.md` — if you
+add a game and its test file, this is what actually guarantees the smoke
+test, logic test, and registry-completeness check (see below) all still
+pass before anything merges.
 
 ## Testing
 
@@ -137,6 +172,23 @@ singleton keyed by game id + level, storing completion and star count.
   type.
 - `test/reset_progress_test.dart` — `ProgressStore.resetAll` unit test, plus
   a full tap-through of the Settings reset-confirmation flow.
+- `test/games/<id>_logic_test.dart` — one per game, driving *real* gameplay
+  logic (not just "boots without crashing"). The common pattern: construct
+  the game's screen widget directly (not through `GameHost`) with a
+  hand-built `GameLevelContext` whose `onComplete`/`onExit` are captured in
+  local test variables, then drive it through its actual tap/drag interface
+  to a genuine win, asserting the callback fires — and separately assert an
+  incomplete/incorrect interaction does *not* falsely fire it. For games with
+  a seeded `Random()` level generator, the test replicates that generation
+  algorithm locally (same seed formula, same call order) to know exactly
+  what to tap/drag; see `test/games/lights_out_logic_test.dart` for the
+  reference example. Two endless games (`merge2048`, `merge_threes`) use an
+  unseeded RNG for tile spawns, so their tests assert invariants (score
+  accounting, an oracle-predicted merge outcome) across many real swipes
+  instead of a scripted win.
+- `test/game_smoke_test.dart` also asserts every `gameRegistry` entry has a
+  non-empty `helpText` and a corresponding `test/games/<id>_logic_test.dart`
+  file — a 21st game can't silently ship without both.
 
 **Authoritative check:** run `flutter test`, not just `flutter analyze` or a
 possibly Gradle-cached `flutter build apk`. Both of the latter have been

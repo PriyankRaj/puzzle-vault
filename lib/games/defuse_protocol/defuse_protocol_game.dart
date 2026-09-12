@@ -22,6 +22,12 @@ final GameDefinition defuseProtocolDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFEF4444), Color(0xFF7F1D1D)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Read the manual text shown for each module, then carry out exactly '
+      'what it says on the module below — cut the wire, press the symbol, '
+      'or flip the switches it describes — and confirm. A wrong action '
+      'sets off the device and ends the attempt, so solve every module in '
+      'order before the timer runs out.',
   builder: (context, ctx) => DefuseProtocolScreen(ctx: ctx),
 );
 
@@ -36,7 +42,13 @@ const List<Color> _wirePalette = [
   Color(0xFF22C55E), // green
   Color(0xFFF8FAFC), // white
 ];
-const List<String> _wirePaletteNames = ['RED', 'BLUE', 'YELLOW', 'GREEN', 'WHITE'];
+const List<String> _wirePaletteNames = [
+  'RED',
+  'BLUE',
+  'YELLOW',
+  'GREEN',
+  'WHITE',
+];
 
 String _wireColorName(Color c) {
   final idx = _wirePalette.indexOf(c);
@@ -114,9 +126,18 @@ class _ToggleModule {
 
 /// One module slot in a level: exactly one of the three fields is set.
 class _ModuleSpec {
-  _ModuleSpec.wire(this.wire) : keypad = null, toggle = null, type = _ModuleType.wire;
-  _ModuleSpec.keypad(this.keypad) : wire = null, toggle = null, type = _ModuleType.keypad;
-  _ModuleSpec.toggle(this.toggle) : wire = null, keypad = null, type = _ModuleType.toggle;
+  _ModuleSpec.wire(this.wire)
+    : keypad = null,
+      toggle = null,
+      type = _ModuleType.wire;
+  _ModuleSpec.keypad(this.keypad)
+    : wire = null,
+      toggle = null,
+      type = _ModuleType.keypad;
+  _ModuleSpec.toggle(this.toggle)
+    : wire = null,
+      keypad = null,
+      type = _ModuleType.toggle;
 
   final _ModuleType type;
   final _WireModule? wire;
@@ -199,7 +220,10 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
 
   _WireModule _generateWireModule(Random rng, int level) {
     final wireCount = (3 + (level - 1) ~/ 3).clamp(3, 6);
-    final colors = List.generate(wireCount, (_) => _wirePalette[rng.nextInt(_wirePalette.length)]);
+    final colors = List.generate(
+      wireCount,
+      (_) => _wirePalette[rng.nextInt(_wirePalette.length)],
+    );
     final ruleId = rng.nextInt(3);
     final correctIndex = _wireRuleIndex(ruleId, colors);
     return _WireModule(
@@ -278,7 +302,8 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
   _KeypadModule _generateKeypadModule(Random rng) {
     final ruleId = rng.nextInt(2); // 0 = appears twice, 1 = appears once
     final patterns = ruleId == 0 ? _patternsAppearsTwice : _patternsAppearsOnce;
-    final pattern = List<int>.from(patterns[rng.nextInt(patterns.length)])..shuffle(rng);
+    final pattern = List<int>.from(patterns[rng.nextInt(patterns.length)])
+      ..shuffle(rng);
     final iconPool = List<IconData>.from(_keypadIconPool)..shuffle(rng);
 
     final flat = <IconData>[];
@@ -304,9 +329,9 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
       ruleId: ruleId,
       manualText: ruleId == 0
           ? 'KEYPAD PROTOCOL: Exactly one symbol on this pad appears '
-              'exactly TWICE. Press that symbol.'
+                'exactly TWICE. Press that symbol.'
           : 'KEYPAD PROTOCOL: Exactly one symbol on this pad appears only '
-              'ONCE. Press that symbol.',
+                'ONCE. Press that symbol.',
       correctIcon: correctIcon,
     );
   }
@@ -318,17 +343,17 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
     do {
       states = List.generate(switchCount, (_) => rng.nextBool());
     } while (
-      // Avoid a starting state that is already solved (no action needed).
-      (ruleId == 0 && states.where((s) => s).length.isEven) ||
-          (ruleId == 1 && states.every((s) => s)));
+    // Avoid a starting state that is already solved (no action needed).
+    (ruleId == 0 && states.where((s) => s).length.isEven) ||
+        (ruleId == 1 && states.every((s) => s)));
     return _ToggleModule(
       initialStates: states,
       ruleId: ruleId,
       manualText: ruleId == 0
           ? 'TOGGLE PROTOCOL: Flip switches (any order) until the number '
-              'of ON switches is EVEN, then confirm.'
+                'of ON switches is EVEN, then confirm.'
           : 'TOGGLE PROTOCOL: Flip exactly the switches that are currently '
-              'OFF, leave the rest untouched, then confirm.',
+                'OFF, leave the rest untouched, then confirm.',
     );
   }
 
@@ -377,8 +402,8 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
       final stars = _wrongCount == 0
           ? 3
           : _wrongCount == 1
-              ? 2
-              : 1;
+          ? 2
+          : 1;
       Future.microtask(() => widget.ctx.onComplete(stars: stars));
     }
   }
@@ -392,7 +417,9 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Device triggered'),
-          content: Text('$reason The device has locked you out of this attempt.'),
+          content: Text(
+            '$reason The device has locked you out of this attempt.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -418,15 +445,19 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final module = _modules[_moduleIndex];
+    // Once the last module is solved, `_advance()` bumps `_moduleIndex` to
+    // `_modules.length` (via setState) and fires `onComplete` on a
+    // microtask — but the result dialog opens as an overlay ON TOP of this
+    // still-mounted screen, so this widget keeps rebuilding (e.g. for the
+    // dialog's own entrance animation) after that index is out of range.
+    // Render a simple "cleared" placeholder instead of indexing `_modules`.
+    final isComplete = _moduleIndex >= _modules.length;
+    final module = isComplete ? null : _modules[_moduleIndex];
     return Scaffold(
       appBar: AppBar(
         title: Text('Defuse Protocol · Level $_level'),
         actions: [
-          TextButton(
-            onPressed: widget.ctx.onExit,
-            child: const Text('Menu'),
-          ),
+          TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
       body: Column(
@@ -437,19 +468,25 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Module ${_moduleIndex + 1}/${_modules.length}',
+                  'Module ${(_moduleIndex + 1).clamp(1, _modules.length)}/${_modules.length}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Row(
                   children: [
-                    Icon(Icons.timer_outlined,
-                        size: 18,
-                        color: _secondsLeft <= 10 ? AppTheme.danger : AppTheme.textSecondary),
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 18,
+                      color: _secondsLeft <= 10
+                          ? AppTheme.danger
+                          : AppTheme.textSecondary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '${_secondsLeft.clamp(0, 999)}s',
                       style: TextStyle(
-                        color: _secondsLeft <= 10 ? AppTheme.danger : AppTheme.textSecondary,
+                        color: _secondsLeft <= 10
+                            ? AppTheme.danger
+                            : AppTheme.textSecondary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -466,10 +503,12 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.danger.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: AppTheme.danger.withValues(alpha: 0.4),
+                ),
               ),
               child: Text(
-                _manualTextFor(module),
+                isComplete ? 'All modules cleared.' : _manualTextFor(module!),
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
@@ -480,7 +519,13 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
           ),
           Expanded(
             child: Center(
-              child: _buildModule(module),
+              child: isComplete
+                  ? Icon(
+                      Icons.check_circle_rounded,
+                      color: AppTheme.success,
+                      size: 64,
+                    )
+                  : _buildModule(module!),
             ),
           ),
           Padding(
@@ -536,7 +581,10 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
                       decoration: BoxDecoration(
                         color: module.colors[i],
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.textSecondary, width: 1),
+                        border: Border.all(
+                          color: AppTheme.textSecondary,
+                          width: 1,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: module.colors[i].withValues(alpha: 0.5),
@@ -548,7 +596,10 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _wireColorName(module.colors[i]),
-                      style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -601,7 +652,10 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Column(
                   children: [
-                    Text('${i + 1}', style: TextStyle(color: AppTheme.textSecondary)),
+                    Text(
+                      '${i + 1}',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
                     Switch(
                       value: _toggleLiveStates![i],
                       activeThumbColor: AppTheme.success,

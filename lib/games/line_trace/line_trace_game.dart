@@ -21,6 +21,10 @@ final GameDefinition lineTraceDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF38BDF8), Color(0xFF0369A1)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Drag from the start dot to the end dot along the grid lines. Your '
+      'path carves the panel into regions — every region must contain only '
+      'one color of square. Fewer failed attempts earns more stars.',
   builder: (context, ctx) => LineTraceScreen(ctx: ctx),
 );
 
@@ -555,8 +559,10 @@ class _LineTraceScreenState extends State<LineTraceScreen> {
                       final size = constraints.maxWidth;
                       final cellSize = size / (_data.dotsX - 1);
                       return GestureDetector(
-                        onPanStart: (d) => _handleTouch(d.localPosition, cellSize),
-                        onPanUpdate: (d) => _handleTouch(d.localPosition, cellSize),
+                        onPanStart: (d) =>
+                            _handleTouch(d.localPosition, cellSize),
+                        onPanUpdate: (d) =>
+                            _handleTouch(d.localPosition, cellSize),
                         child: CustomPaint(
                           size: Size(size, size),
                           painter: _LineTracePainter(

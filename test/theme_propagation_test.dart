@@ -49,59 +49,66 @@ void main() {
     expect(
       afterColor,
       isNot(equals(beforeColor)),
-      reason: 'Sound effects tile did not repaint after the theme toggle — '
+      reason:
+          'Sound effects tile did not repaint after the theme toggle — '
           'the light/dark setting is not propagating to already-mounted '
           'widgets that only listen to a different notifier.',
     );
   });
 
-  testWidgets('toggling dark mode updates an already-open game screen via GameHost', (tester) async {
-    // "Tile Toggle" paints an off-tile's color directly from
-    // `AppTheme.surfaceHigh` inside its GridView.builder itemBuilder (i.e.
-    // re-evaluated on every build, not cached at initState) — a solid,
-    // concrete probe for whether GameHost's rebuild-on-toggle actually
-    // reaches a live game screen's rendering.
-    final def = gameRegistry.firstWhere((d) => d.id == 'lights_out');
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark(),
-        home: GameHost(def: def, initialLevel: 1),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+  testWidgets(
+    'toggling dark mode updates an already-open game screen via GameHost',
+    (tester) async {
+      // "Tile Toggle" paints an off-tile's color directly from
+      // `AppTheme.surfaceHigh` inside its GridView.builder itemBuilder (i.e.
+      // re-evaluated on every build, not cached at initState) — a solid,
+      // concrete probe for whether GameHost's rebuild-on-toggle actually
+      // reaches a live game screen's rendering.
+      final def = gameRegistry.firstWhere((d) => d.id == 'lights_out');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark(),
+          home: GameHost(def: def, initialLevel: 1),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    Color offTileColor() {
-      final decoratedBoxes = tester.widgetList<Container>(find.byType(Container));
-      for (final c in decoratedBoxes) {
-        final decoration = c.decoration;
-        if (decoration is BoxDecoration && decoration.borderRadius != null) {
-          return decoration.color!;
+      Color offTileColor() {
+        final decoratedBoxes = tester.widgetList<Container>(
+          find.byType(Container),
+        );
+        for (final c in decoratedBoxes) {
+          final decoration = c.decoration;
+          if (decoration is BoxDecoration && decoration.borderRadius != null) {
+            return decoration.color!;
+          }
         }
+        throw StateError('no tile container found');
       }
-      throw StateError('no tile container found');
-    }
 
-    final colorBefore = offTileColor();
+      final colorBefore = offTileColor();
 
-    // This mirrors production: the app root sets the brightness flag, and
-    // GameHost's own listener (on the same notifier) is what forces the
-    // already-open game screen to rebuild and pick it up.
-    AppTheme.setBrightness(Brightness.light);
-    await AppSettingsStore.instance.setDarkMode(false);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      // This mirrors production: the app root sets the brightness flag, and
+      // GameHost's own listener (on the same notifier) is what forces the
+      // already-open game screen to rebuild and pick it up.
+      AppTheme.setBrightness(Brightness.light);
+      await AppSettingsStore.instance.setDarkMode(false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    final colorAfter = offTileColor();
+      final colorAfter = offTileColor();
 
-    expect(
-      colorAfter,
-      isNot(equals(colorBefore)),
-      reason: 'The already-open game screen did not repaint in the new '
-          'palette after the theme toggle.',
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        colorAfter,
+        isNot(equals(colorBefore)),
+        reason:
+            'The already-open game screen did not repaint in the new '
+            'palette after the theme toggle.',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test('Motion.ms zeroes durations when Animations is off', () {
     AppSettingsStore.instance.animationsEnabled.value = true;
@@ -117,15 +124,21 @@ void main() {
     await AppSettingsStore.instance.setAnimationsEnabled(false);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.dark(), home: GameHost(def: def, initialLevel: 1)),
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: GameHost(def: def, initialLevel: 1),
+      ),
     );
     await tester.pump();
 
-    final tile = tester.widgetList<AnimatedContainer>(find.byType(AnimatedContainer)).first;
+    final tile = tester
+        .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+        .first;
     expect(
       tile.duration,
       Duration.zero,
-      reason: "Tile Toggle's tiles should stop animating once Animations is off.",
+      reason:
+          "Tile Toggle's tiles should stop animating once Animations is off.",
     );
 
     await AppSettingsStore.instance.setAnimationsEnabled(true);
@@ -137,7 +150,8 @@ void main() {
     expect(
       instant.builders[TargetPlatform.android].runtimeType,
       isNot(equals(animated.builders[TargetPlatform.android].runtimeType)),
-      reason: 'Disabling Animations should swap the route transition '
+      reason:
+          'Disabling Animations should swap the route transition '
           'builder to a no-op one, not leave the default slide/fade.',
     );
   });

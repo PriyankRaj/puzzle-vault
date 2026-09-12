@@ -21,6 +21,10 @@ final GameDefinition gradientSortDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFF472B6), Color(0xFFBE185D)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap a chip, then tap another chip in the same row to swap them. '
+      'Arrange every row so its colors flow smoothly from one endpoint to '
+      'the other — fewer swaps earns more stars.',
   builder: (context, ctx) => GradientSortScreen(ctx: ctx),
 );
 
@@ -74,8 +78,8 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
     final laneCount = _level <= 5
         ? 1
         : _level <= 10
-            ? 2
-            : 3;
+        ? 2
+        : 3;
     final chipCount = (5 + (_level - 1) ~/ 3).clamp(5, 9);
 
     _lanes = List.generate(laneCount, (_) => _buildLane(rng, chipCount));
@@ -92,7 +96,12 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
     final startLightness = 0.35 + rng.nextDouble() * 0.15;
     final endLightness = 0.55 + rng.nextDouble() * 0.2;
 
-    final startColor = HSLColor.fromAHSL(1, startHue, saturation, startLightness);
+    final startColor = HSLColor.fromAHSL(
+      1,
+      startHue,
+      saturation,
+      startLightness,
+    );
     final endColor = HSLColor.fromAHSL(1, endHue, saturation, endLightness);
 
     final colors = List.generate(chipCount, (i) {
@@ -173,8 +182,8 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
       final stars = _swapCount == _totalMinSwaps
           ? 3
           : _swapCount <= _totalMinSwaps + 2
-              ? 2
-              : 1;
+          ? 2
+          : 1;
       Future.microtask(() => widget.ctx.onComplete(stars: stars));
     }
   }

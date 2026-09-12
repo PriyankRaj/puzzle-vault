@@ -17,6 +17,10 @@ final GameDefinition lightsOutDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFFBBF24), Color(0xFFB45309)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap any tile to flip it and its up/down/left/right neighbours. '
+      'The goal is to turn every tile off. Every level is solvable — fewer '
+      'taps earns more stars.',
   builder: (context, ctx) => LightsOutScreen(ctx: ctx),
 );
 
@@ -42,8 +46,8 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
     _size = _level <= 5
         ? 3
         : _level <= 10
-            ? 4
-            : 5;
+        ? 4
+        : 5;
     _grid = List.generate(_size, (_) => List.filled(_size, false));
     final scramble = 4 + _level; // deeper scramble at higher levels
     final rng = Random(1000 + _level); // deterministic per level
@@ -79,8 +83,8 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
       final stars = _moves <= optimalGuess
           ? 3
           : _moves <= optimalGuess + 3
-              ? 2
-              : 1;
+          ? 2
+          : 1;
       Future.microtask(() => widget.ctx.onComplete(stars: stars));
     }
   }
@@ -93,7 +97,10 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text('Moves: $_moves', style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              'Moves: $_moves',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           Expanded(
             child: Center(
@@ -123,7 +130,9 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
                             boxShadow: on
                                 ? [
                                     BoxShadow(
-                                      color: AppTheme.warning.withValues(alpha: 0.5),
+                                      color: AppTheme.warning.withValues(
+                                        alpha: 0.5,
+                                      ),
                                       blurRadius: 12,
                                       spreadRadius: 1,
                                     ),

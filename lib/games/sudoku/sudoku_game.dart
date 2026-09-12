@@ -19,6 +19,11 @@ final GameDefinition sudokuDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF60A5FA), Color(0xFF2563EB)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap a cell, then tap a number to fill it in. Fill the whole grid so '
+      'every row, every column and every 3x3 box contains each digit 1-9 '
+      'exactly once. Given (bold) numbers can\'t be changed — fewer mistakes '
+      'earns more stars.',
   builder: (context, ctx) => SudokuScreen(ctx: ctx),
 );
 
@@ -69,7 +74,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
   List<List<int>> _generateSolved(Random rng) {
     var grid = List.generate(
       _side,
-      (r) => List.generate(_side, (c) => (_base * (r % _base) + r ~/ _base + c) % _side + 1),
+      (r) => List.generate(
+        _side,
+        (c) => (_base * (r % _base) + r ~/ _base + c) % _side + 1,
+      ),
     );
 
     final digits = List.generate(_side, (i) => i + 1)..shuffle(rng);
@@ -96,7 +104,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
     grid = grid.map((row) => [for (final idx in colPerm) row[idx]]).toList();
 
     if (rng.nextBool()) {
-      grid = List.generate(_side, (r) => List.generate(_side, (c) => grid[c][r]));
+      grid = List.generate(
+        _side,
+        (r) => List.generate(_side, (c) => grid[c][r]),
+      );
     }
 
     return grid;
@@ -161,8 +172,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
       final stars = _mistakes == 0
           ? 3
           : _mistakes <= 3
-              ? 2
-              : 1;
+          ? 2
+          : 1;
       Future.microtask(() => widget.ctx.onComplete(stars: stars));
     }
   }
@@ -200,14 +211,18 @@ class _SudokuScreenState extends State<SudokuScreen> {
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceHigh,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.textSecondary, width: 2),
+                      border: Border.all(
+                        color: AppTheme.textSecondary,
+                        width: 2,
+                      ),
                     ),
                     child: GridView.builder(
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _side * _side,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _side,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: _side,
+                          ),
                       itemBuilder: (context, index) {
                         final r = index ~/ _side;
                         final c = index % _side;
@@ -305,7 +320,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: _padButton(child: Text('$d'), onTap: () => _enterDigit(d)),
+                child: _padButton(
+                  child: Text('$d'),
+                  onTap: () => _enterDigit(d),
+                ),
               ),
             ),
           Expanded(

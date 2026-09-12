@@ -23,6 +23,11 @@ final GameDefinition physicsLogicDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF2DD4BF), Color(0xFF115E59)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Draw freehand strokes on the canvas to build ramps and walls, then '
+      'tap Launch to drop the ball under gravity. Guide it into the '
+      'pulsing green goal and let it come to rest there. You have a '
+      'limited ink budget, so use it wisely — using less earns more stars.',
   builder: (context, ctx) => PhysicsLogicScreen(ctx: ctx),
 );
 
@@ -335,6 +340,12 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
 
   void _onTick(Duration elapsed) {
     if (!mounted) return;
+    // Once the level is won, the result dialog opens as an overlay on top
+    // of this still-mounted screen (see GameHost) — without this guard the
+    // ticker keeps stepping physics and calling setState every frame for as
+    // long as that dialog stays open, matching the pattern already guarded
+    // against in ragdoll_trials_game.dart / snip_logic_game.dart.
+    if (_completed) return;
     var dt = (elapsed - _lastElapsed).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
     if (dt <= 0) return;
@@ -547,7 +558,10 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
       appBar: AppBar(
         title: Text('Physics Logic · Level $_level'),
         actions: [
-          TextButton(onPressed: widget.ctx.onExit, child: const Text('Give up')),
+          TextButton(
+            onPressed: widget.ctx.onExit,
+            child: const Text('Give up'),
+          ),
         ],
       ),
       body: Column(
@@ -569,7 +583,9 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
                       ? 'Settled!'
                       : (_running ? 'Simulating…' : 'Draw, then launch'),
                   style: TextStyle(
-                    color: _completed ? AppTheme.success : AppTheme.textSecondary,
+                    color: _completed
+                        ? AppTheme.success
+                        : AppTheme.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -613,7 +629,10 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
                           animation: _pulseController,
                           builder: (context, _) {
                             return CustomPaint(
-                              size: Size(constraints.maxWidth, constraints.maxHeight),
+                              size: Size(
+                                constraints.maxWidth,
+                                constraints.maxHeight,
+                              ),
                               painter: _PhysicsLogicPainter(
                                 scale: scale,
                                 spec: _spec,
@@ -652,7 +671,9 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: (!_running && !_completed) ? _clearDrawing : null,
+                    onPressed: (!_running && !_completed)
+                        ? _clearDrawing
+                        : null,
                     child: const Text('Clear drawing'),
                   ),
                 ),

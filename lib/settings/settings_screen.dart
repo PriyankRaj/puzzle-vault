@@ -32,7 +32,9 @@ class SettingsScreen extends StatelessWidget {
             valueListenable: store.isDarkMode,
             builder: (context, isDark, _) {
               return _SettingsTile(
-                icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                icon: isDark
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
                 title: 'Dark theme',
                 subtitle: isDark ? 'On' : 'Off — using light theme',
                 trailing: Switch(
@@ -50,7 +52,9 @@ class SettingsScreen extends StatelessWidget {
             valueListenable: store.soundEnabled,
             builder: (context, enabled, _) {
               return _SettingsTile(
-                icon: enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                icon: enabled
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_rounded,
                 title: 'Sound effects',
                 subtitle: 'Taps, wins and mistakes make a sound',
                 trailing: Switch(
@@ -84,7 +88,8 @@ class SettingsScreen extends StatelessWidget {
           _SettingsTile(
             icon: Icons.restart_alt_rounded,
             title: 'Reset all progress',
-            subtitle: 'Clears unlocked levels, stars and best scores for every game',
+            subtitle:
+                'Clears unlocked levels, stars and best scores for every game',
             trailing: TextButton(
               onPressed: () => _confirmResetAll(context),
               style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
@@ -184,11 +189,20 @@ class _SettingsTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),

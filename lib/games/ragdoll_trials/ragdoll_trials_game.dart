@@ -25,6 +25,14 @@ final GameDefinition ragdollTrialsDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFC084FC), Color(0xFF6B21A8)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Hold the left or right button to push the blob and tumble it across '
+      'the course. Gravity pulls it down, so build up speed on the runways '
+      'before each gap and steer clear of spinning hazards. Holding a '
+      'button too long overshoots — ease off, or tap the opposite button '
+      'briefly, so the blob slows down and settles inside the glowing goal '
+      'zone rather than rolling straight through it. Fewer falls earns '
+      'more stars.',
   builder: (context, ctx) => RagdollTrialsScreen(ctx: ctx),
 );
 
@@ -118,10 +126,7 @@ final List<_LevelSpec> _levels = [
   // purely about getting comfortable with falling and steering.
   const _LevelSpec(
     start: Offset(70, 340),
-    platforms: [
-      Rect.fromLTWH(0, 380, 160, 24),
-      Rect.fromLTWH(0, 560, 400, 40),
-    ],
+    platforms: [Rect.fromLTWH(0, 380, 160, 24), Rect.fromLTWH(0, 560, 400, 40)],
     goal: Rect.fromLTWH(300, 515, 70, 45),
   ),
   // Level 6 — two floor gaps (40px, 30px) plus the first hazard: a spinning
@@ -577,7 +582,10 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
       appBar: AppBar(
         title: Text('Ragdoll Trials · Level $_level'),
         actions: [
-          TextButton(onPressed: widget.ctx.onExit, child: const Text('Give up')),
+          TextButton(
+            onPressed: widget.ctx.onExit,
+            child: const Text('Give up'),
+          ),
         ],
       ),
       body: Column(
@@ -622,7 +630,10 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
                             animation: _pulseController,
                             builder: (context, _) {
                               return CustomPaint(
-                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                size: Size(
+                                  constraints.maxWidth,
+                                  constraints.maxHeight,
+                                ),
                                 painter: _RagdollTrialsPainter(
                                   scale: constraints.maxWidth / _canvasW,
                                   spec: _spec,
@@ -700,15 +711,31 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Row(
         children: [
-          Expanded(child: _buildHoldButton(Icons.chevron_left_rounded, canPlay, _setPushLeft)),
+          Expanded(
+            child: _buildHoldButton(
+              Icons.chevron_left_rounded,
+              canPlay,
+              _setPushLeft,
+            ),
+          ),
           const SizedBox(width: 16),
-          Expanded(child: _buildHoldButton(Icons.chevron_right_rounded, canPlay, _setPushRight)),
+          Expanded(
+            child: _buildHoldButton(
+              Icons.chevron_right_rounded,
+              canPlay,
+              _setPushRight,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHoldButton(IconData icon, bool enabled, void Function(bool) setHeld) {
+  Widget _buildHoldButton(
+    IconData icon,
+    bool enabled,
+    void Function(bool) setHeld,
+  ) {
     return GestureDetector(
       onTapDown: enabled ? (_) => setHeld(true) : null,
       onTapUp: enabled ? (_) => setHeld(false) : null,
@@ -768,9 +795,15 @@ class _RagdollTrialsPainter extends CustomPainter {
     }
 
     // Goal zone (pulsing).
-    final goalRR = RRect.fromRectAndRadius(spec.goal, const Radius.circular(10));
+    final goalRR = RRect.fromRectAndRadius(
+      spec.goal,
+      const Radius.circular(10),
+    );
     final pulseAlpha = 0.28 + 0.24 * pulse;
-    canvas.drawRRect(goalRR, Paint()..color = AppTheme.success.withValues(alpha: pulseAlpha));
+    canvas.drawRRect(
+      goalRR,
+      Paint()..color = AppTheme.success.withValues(alpha: pulseAlpha),
+    );
     canvas.drawRRect(
       goalRR,
       Paint()
@@ -806,7 +839,11 @@ class _RagdollTrialsPainter extends CustomPainter {
     canvas.rotate(visualRotation);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset.zero, width: _blobRadius * 2.4, height: _blobRadius * 1.5),
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: _blobRadius * 2.4,
+          height: _blobRadius * 1.5,
+        ),
         Radius.circular(_blobRadius * 0.75),
       ),
       Paint()
@@ -814,7 +851,11 @@ class _RagdollTrialsPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
     final capsule = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset.zero, width: _blobRadius * 2.2, height: _blobRadius * 1.3),
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: _blobRadius * 2.2,
+        height: _blobRadius * 1.3,
+      ),
       Radius.circular(_blobRadius * 0.65),
     );
     canvas.drawRRect(capsule, Paint()..color = AppTheme.accent);

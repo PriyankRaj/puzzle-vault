@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app/theme.dart';
 import 'core/progress_store.dart';
@@ -7,6 +8,13 @@ import 'home/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Every game's layout (grids, AppBar + board columns) was built assuming
+  // portrait; landscape isn't supported by any of the 20 games' UIs, so
+  // lock it here rather than leave dead space or overflow to fix per-game.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   await ProgressStore.instance.init();
   await AppSettingsStore.instance.init();
   runApp(const PuzzleVaultApp());

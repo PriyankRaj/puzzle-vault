@@ -18,6 +18,10 @@ final GameDefinition loopTraceDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFFB7185), Color(0xFF9D174D)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap an edge between two dots to toggle it on or off. Draw a single '
+      'closed loop (no branches, no separate pieces) so that every numbered '
+      'cell has exactly that many of its four edges switched on.',
   builder: (context, ctx) => LoopTraceScreen(ctx: ctx),
 );
 
@@ -339,9 +343,7 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
     if (!_isSingleLoop(_hOn, _vOn, _n)) return;
     _solved = true;
     final par = _parEdgeCount + 4;
-    final stars = _toggles <= par
-        ? 3
-        : (_toggles <= par + 6 ? 2 : 1);
+    final stars = _toggles <= par ? 3 : (_toggles <= par + 6 ? 2 : 1);
     Future.microtask(() => widget.ctx.onComplete(stars: stars));
   }
 
@@ -352,7 +354,10 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
         title: Text('Level $_level'),
         actions: [
           TextButton(onPressed: _clear, child: const Text('Clear')),
-          TextButton(onPressed: widget.ctx.onExit, child: const Text('Give up')),
+          TextButton(
+            onPressed: widget.ctx.onExit,
+            child: const Text('Give up'),
+          ),
         ],
       ),
       body: Column(
@@ -435,7 +440,8 @@ class _LoopTracePainter extends CustomPainter {
       ..color = AppTheme.accent
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
-    final dotPaint = Paint()..color = AppTheme.textSecondary.withValues(alpha: 0.6);
+    final dotPaint = Paint()
+      ..color = AppTheme.textSecondary.withValues(alpha: 0.6);
 
     for (var i = 0; i <= n; i++) {
       for (var j = 0; j < n; j++) {

@@ -57,10 +57,39 @@ category, give it a generic name, and implement it from scratch.
   visible benefit. Only user-facing surfaces were renamed: in-app title/
   AppBar, `CFBundleDisplayName`/`CFBundleName` (iOS), `android:label`
   (Android), and the `PuzzleVaultApp` root widget class.
-- **`provider` is in `pubspec.yaml` but unused.** It was added early and
+- **`provider` was removed from `pubspec.yaml`.** It was added early and
   never actually wired in — state is plain `ValueNotifier`/`StatefulWidget`
-  throughout. Safe to remove if you want to trim dependencies; not removed
-  yet because no one asked.
+  throughout; the only reference to the word "provider" anywhere in `lib/`
+  was a comment about `path_provider`, not an actual import.
+- **The app icon is generated, not hand-designed.** `assets/icon/icon.png`
+  (a vault-dial glyph on the `AppTheme.accent` gradient, 1024x1024) is the
+  source of truth; every Android `mipmap-*/ic_launcher.png` and iOS
+  `AppIcon.appiconset/Icon-App-*.png` was produced by resizing it with Pillow
+  (see the one-off script that produced them — not checked in; regenerate
+  with any image tool if the source icon changes). No `flutter_launcher_icons`
+  dependency was added; the existing filenames/`Contents.json` were reused
+  as-is, only the pixel content changed. iOS icons are flattened onto an
+  opaque background (App Store rejects icons with alpha).
+- **Android also has a proper adaptive icon**, not just the legacy square
+  PNG. `mipmap-anydpi-v26/ic_launcher.xml` + `mipmap-*/ic_launcher_foreground.png`
+  (glyph only, transparent background, scaled to fit inside the ~66% "safe
+  zone" launchers don't clip) + `values/colors.xml`'s
+  `ic_launcher_background` (the gradient's darker end, `#1E2982`, since an
+  adaptive icon's background layer must be a flat color, not a gradient).
+  Without this, modern launchers would mask the already-rounded flat icon
+  with their own shape, double-rounding or cropping it. Android resolves
+  `@mipmap/ic_launcher` to the `-v26` adaptive version on API 26+
+  automatically and falls back to the legacy PNG below that — no manifest
+  change needed, both live under the same resource name.
+- **Every game has a "How to play" info tip** (`GameDefinition.helpText` +
+  `InfoTipButton`) — see `ARCHITECTURE.md` for where it's wired in and why
+  only 2 of the 20 game files needed a direct edit for it.
+- **Every game has a real logic-driving test**, not just a boot smoke test
+  — see `ARCHITECTURE.md`'s testing section. These were written by 4
+  parallel agents each covering ~5 games; every test was independently
+  verified green via `flutter test` and `flutter analyze` before being
+  accepted, and one of them (batch covering `defuse_protocol`) surfaced a
+  real bug — see "Bugs found and fixed" above.
 - **Sound is intentionally thin** (`Sfx` = `SystemSound.play` +
   `HapticFeedback` patterns only, no real synthesized tones). A richer
   version using the `audioplayers` package was attempted and reverted: adding
@@ -104,12 +133,142 @@ category, give it a generic name, and implement it from scratch.
   `const_initialized_with_non_constant_value` or similar, this is why: don't
   mark something `const` if it touches `AppTheme.*`.
 
+## Bugs found and fixed while adding logic tests
+
+Writing real logic-driving tests (as opposed to boot smoke tests) surfaced an
+actual production bug in `defuse_protocol_game.dart`: `build()` indexed
+`_modules[_moduleIndex]` unconditionally, but `_advance()` bumps
+`_moduleIndex` to `_modules.length` via `setState` the moment the last module
+is solved — and the result dialog opens as an *overlay* on top of the still-
+mounted `DefuseProtocolScreen`, not in place of it, so the screen keeps
+rebuilding (e.g. for the dialog's own entrance animation) with an
+out-of-range index. This would throw `RangeError` on completing the last
+module of any level in real play. Fixed by rendering a "cleared" placeholder
+when `_moduleIndex >= _modules.length` instead of indexing into `_modules`.
+The regression test in `test/games/defuse_protocol_logic_test.dart`
+deliberately pumps an extra frame after the completing action specifically
+to catch this class of bug — don't "simplify" that pump away.
+
+This is worth generalizing: any game whose `build()` indexes into a list
+using a counter that can be incremented past the list's bounds by the same
+`setState` that reports completion should either clamp/guard that index or
+check for the completed state before indexing, since `GameHost` never
+unmounts the screen synchronously on `onComplete` — it shows a dialog on top
+of it first.
+
+A follow-up audit of the same "screen stays mounted under the result
+dialog" hazard, this time for `Timer`/`AnimationController`/`Ticker`
+lifecycles, found: `defuse_protocol`'s `Timer.periodic` was already
+correctly cancelled in `dispose()`; `ragdoll_trials` and `snip_logic`'s
+physics `Ticker`s already short-circuited in `_onTick` once
+`_completed`/`_failed` was set; but `physics_logic`'s `_onTick` had no such
+guard — it kept stepping physics and calling `setState` every frame for as
+long as the result dialog stayed open after a win. Fixed by adding the same
+`if (_completed) return;` guard the other two games already had. This
+wasn't a crash, just wasted CPU/battery and unnecessary rebuilds, but it's
+the same root cause shape as the `defuse_protocol` bug: don't assume a
+callback/ticker stops just because the level "ended" — `GameHost` keeps the
+screen alive and ticking until the player dismisses the dialog.
+
+## Store readiness
+
+`store/` holds everything prepared for Play Store / App Store submission
+that could be done without an Apple Developer account, a Play Console
+account, or a full Xcode install — see `store/PLAY_STORE_READINESS.md` and
+`store/APP_STORE_READINESS.md` for the full checklists (each explicitly
+marks what's ready vs. what still needs a human decision or an environment
+this machine doesn't have).
+
+- **The iOS app icon was regenerated mid-pass.** It had been resized from
+  the same rounded-square master used for the in-app/Android icon
+  (`assets/icon/icon.png`), which bakes a rounded shape into a flat-color
+  square. iOS applies its *own* corner mask at render time, so a
+  pre-rounded icon shows a visible mismatched patch in the true corners
+  once iOS re-masks it — a real defect, not just a style nit. Fixed by
+  rendering a second, full-bleed square master (same vault-dial glyph and
+  gradient, no rounding, no padding) specifically for
+  `ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png`. The Android
+  adaptive icon doesn't have this problem since its foreground/background
+  split was already designed for launcher-applied masking from the start
+  (see the icon bullet above) — only the *legacy* pre-adaptive-icon PNGs
+  and the in-app icon still intentionally use the pre-rounded master, since
+  those are displayed as-is with no further masking.
+- **Screenshots exist only for Android**, captured from the `bhasha_test`
+  emulator after temporarily overriding its display to 1080×1920/440dpi
+  (see `store/screenshots/android/README.md` for the exact repro). No iOS
+  screenshots exist — this machine has Xcode Command Line Tools but not a
+  full Xcode install, so no iOS build has ever been run, let alone
+  screenshotted.
+- **Android upload keystore was generated on 2026-09-11, with the user's
+  explicit go-ahead** (asked first, since this is exactly the kind of
+  action too consequential to do speculatively — see the superseded
+  bullet below). Kept outside this repo at
+  `~/keystores/puzzle-vault/upload-keystore.jks`, wired into
+  `android/app/build.gradle.kts` (falls back to debug signing if
+  `android/key.properties` is absent, so other checkouts/CI still build),
+  and verified with a real signed release build. The user still needs to
+  personally back up the keystore file + password somewhere durable — see
+  `~/keystores/puzzle-vault/README.txt`, which has the password and
+  explains the stakes (losing it permanently blocks future updates to the
+  app under the same Play listing).
+- **iOS signing/provisioning is still not done** — needs an active Apple
+  Developer Program account, which nothing here can create (requires the
+  user's own login + payment).
+- ~~No signing/keystore work was done for either platform.~~ Superseded
+  for Android by the bullet above; still true for iOS.
+- **The privacy policy is hosted at
+  https://priyankraj.github.io/puzzle-vault-privacy/** — a small,
+  separate, dedicated public GitHub repo (`PriyankRaj/puzzle-vault-privacy`)
+  containing only the policy page, deliberately *not* this app's source.
+  Publishing this whole repo publicly wasn't asked for and wasn't done;
+  only the one page needed for store submission was published.
+
+## Orientation
+
+The app is locked to portrait everywhere (`SystemChrome.setPreferredOrientations`
+in `main.dart`, plus native-level locks in `Info.plist` and
+`AndroidManifest.xml`'s `android:screenOrientation="portrait"`). None of the
+20 games' layouts (AppBar + padded board in a `Column`, fixed-aspect grids)
+were built with landscape in mind, so this was a deliberate simplification
+rather than a per-game landscape layout pass. If a future game genuinely
+needs landscape (unlikely for this genre), it would need its own layout
+work, not just removing this lock.
+
 ## Known gaps (not requested, not done)
 
-- **iOS build is unverified** on this machine — Xcode Command Line Tools only,
-  no full Xcode, so no iOS simulator/device build has actually been run.
-  Android (`flutter build apk --debug`) is the verified baseline. Don't
-  assume iOS parity without building on a machine with full Xcode.
+- **iOS build was verified on 2026-09-11** on a machine with a full Xcode
+  26.6 install (`flutter build ios --debug --no-codesign` succeeds; the app
+  runs correctly on an iPhone 16 Pro Max simulator). This superseded the
+  earlier "iOS build is unverified" gap — see `store/APP_STORE_READINESS.md`
+  for the full writeup. What's still unverified: real device signing/
+  provisioning (needs an Apple Developer account), and 3 of the 5 usual
+  App Store screenshots (gameplay, Settings, light-theme home) — Simulator
+  UI automation via synthetic mouse clicks (`cliclick`) reliably drove the
+  app from home into a game's level-select screen, but repeatedly failed to
+  register a tap on a level tile to reach actual gameplay, for reasons not
+  root-caused (see below). Don't assume this means real device behavior is
+  unverified too — only signing/provisioning and those 3 screenshots are.
+- **Desktop GUI automation for iOS screenshots is unreliable and was
+  abandoned mid-pass**, for a different reason than the Android emulator's
+  known `adb input tap` flakiness (see the Android bullet below — same
+  *symptom* class, different cause). Using `cliclick`/AppleScript System
+  Events to drive the Simulator window: a tap on the home screen's game
+  tile worked reliably (reproduced twice, clean launches both times), but
+  an identically-computed tap on the resulting level-select screen's level
+  tile never registered, even after confirming (via `System Events... get
+  name of first application process whose frontmost is true`) that
+  Simulator was frontmost immediately before and after the click, and after
+  a full Simulator app restart. Also discovered mid-debugging: this
+  machine's desktop was shared with another unrelated, actively-used
+  terminal window (a different live Claude Code session on another
+  project) — `tell application "Simulator" to activate` did not reliably
+  keep Simulator frontmost against that window's own real-time activity,
+  and at least one synthetic click landed on that other window instead
+  (harmlessly, in empty scrollback — no keystrokes were ever sent to it,
+  only mouse clicks). **Do not resume this kind of automation on a shared/
+  multi-session desktop** — verify exclusive foreground focus first, or
+  capture screenshots by hand via Simulator's own Cmd+S shortcut instead of
+  programmatic clicking.
 - **No accessibility pass** — no screen-reader semantics review, no
   text-scaling verification. Not requested by the user, flagged here so it
   isn't mistaken for "considered and rejected."

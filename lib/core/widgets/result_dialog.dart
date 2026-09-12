@@ -35,19 +35,10 @@ Future<void> showLevelCompleteDialog(
         ),
         actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
-          TextButton(
-            onPressed: onMenu,
-            child: const Text('Menu'),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
+          TextButton(onPressed: onMenu, child: const Text('Menu')),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
           if (hasNextLevel)
-            ElevatedButton(
-              onPressed: onNext,
-              child: const Text('Next'),
-            ),
+            ElevatedButton(onPressed: onNext, child: const Text('Next')),
         ],
       );
     },

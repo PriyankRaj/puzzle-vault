@@ -20,6 +20,15 @@ final GameDefinition ruleBreakerDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFA78BFA), Color(0xFF6D28D9)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Swipe to walk your character around the grid. Word-tiles like WALL, '
+      'IS and STOP can be pushed like blocks — line three of them up as '
+      'NOUN IS PROPERTY (e.g. WALL IS STOP) to make that rule active, which '
+      'changes how matching objects behave. Reach an object with an active '
+      '"WIN" rule to clear the level. Some levels need the opposite move '
+      'too: push a word out of formation to break a rule that is in your '
+      'way (e.g. shove the WALL tile out of "WALL IS STOP" so walls stop '
+      'blocking you).',
   builder: (context, ctx) => RuleBreakerScreen(ctx: ctx),
 );
 
@@ -109,7 +118,12 @@ const Map<TileKind, String> _nounLabel = {
 /// small ASCII layout into a list of these; positions mutate as tiles are
 /// pushed around during play.
 class GameObject {
-  GameObject({required this.id, required this.kind, required this.row, required this.col});
+  GameObject({
+    required this.id,
+    required this.kind,
+    required this.row,
+    required this.col,
+  });
 
   final int id;
   final TileKind kind;
@@ -155,7 +169,16 @@ const List<List<String>> _levels = [
   ['P...#.F', '.......', '..wis..', '.......', '..gin..', '.......', '.biu...'],
   // 15: largest board, combine a WIN tile that must be assembled with two
   // decorative rules already active elsewhere.
-  ['P.......', '........', '........', '.gi.n..F', '........', '.biu....', '.wis....', '........'],
+  [
+    'P.......',
+    '........',
+    '........',
+    '.gi.n..F',
+    '........',
+    '.biu....',
+    '.wis....',
+    '........',
+  ],
 ];
 
 class RuleBreakerScreen extends StatefulWidget {
@@ -254,7 +277,9 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
     }
   }
 
-  List<Point<int>> _snapshot() => [for (final o in _objects) Point(o.row, o.col)];
+  List<Point<int>> _snapshot() => [
+    for (final o in _objects) Point(o.row, o.col),
+  ];
 
   void _restore(List<Point<int>> snap) {
     for (var i = 0; i < _objects.length; i++) {
@@ -266,7 +291,9 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
   void _checkWin() {
     for (final o in _objects) {
       if (!_nounKinds.contains(o.kind)) continue;
-      if (o.row == _player.row && o.col == _player.col && _hasProperty(o.kind, 'win')) {
+      if (o.row == _player.row &&
+          o.col == _player.col &&
+          _hasProperty(o.kind, 'win')) {
         _won = true;
         return;
       }
@@ -432,7 +459,9 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
         decoration: BoxDecoration(
           color: visual.color.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(10),
-          border: ruleColor != null ? Border.all(color: ruleColor, width: 2.5) : null,
+          border: ruleColor != null
+              ? Border.all(color: ruleColor, width: 2.5)
+              : null,
         ),
         alignment: Alignment.center,
         child: Icon(visual.icon, color: visual.color, size: 26),
@@ -485,7 +514,10 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Moves: $_moves', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Moves: $_moves',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 TextButton.icon(
                   onPressed: _history.isEmpty ? null : _undo,
                   icon: const Icon(Icons.undo_rounded, size: 18),
@@ -504,7 +536,10 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
                       Center(
                         child: Text(
                           'No active rules',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ]
@@ -513,7 +548,13 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Chip(
-                            label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                            label: Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             backgroundColor: AppTheme.accentSoft,
                             visualDensity: VisualDensity.compact,
                           ),
@@ -541,7 +582,9 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
                     child: GridView.builder(
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _width * _height,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _width),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: _width,
+                      ),
                       itemBuilder: (context, index) {
                         final r = index ~/ _width;
                         final c = index % _width;

@@ -36,8 +36,10 @@ class AppTheme {
   static Color get textSecondary =>
       isDark ? const Color(0xFF9AA3C7) : const Color(0xFF5B6178);
 
-  static ThemeData dark({bool animate = true}) => _build(Brightness.dark, animate);
-  static ThemeData light({bool animate = true}) => _build(Brightness.light, animate);
+  static ThemeData dark({bool animate = true}) =>
+      _build(Brightness.dark, animate);
+  static ThemeData light({bool animate = true}) =>
+      _build(Brightness.light, animate);
 
   static ThemeData _build(Brightness brightness, bool animate) {
     final bg = brightness == Brightness.dark
@@ -62,8 +64,18 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: bg,
       colorScheme: brightness == Brightness.dark
-          ? ColorScheme.dark(primary: acc, secondary: const Color(0xFF4E5A9E), surface: surf, error: dang)
-          : ColorScheme.light(primary: acc, secondary: const Color(0xFFC7CEFB), surface: surf, error: dang),
+          ? ColorScheme.dark(
+              primary: acc,
+              secondary: const Color(0xFF4E5A9E),
+              surface: surf,
+              error: dang,
+            )
+          : ColorScheme.light(
+              primary: acc,
+              secondary: const Color(0xFFC7CEFB),
+              surface: surf,
+              error: dang,
+            ),
       fontFamily: 'Roboto',
     );
     return base.copyWith(
@@ -79,10 +91,7 @@ class AppTheme {
           letterSpacing: 0.2,
         ),
       ),
-      textTheme: base.textTheme.apply(
-        bodyColor: txt,
-        displayColor: txt,
-      ),
+      textTheme: base.textTheme.apply(bodyColor: txt, displayColor: txt),
       cardTheme: CardThemeData(
         color: surf,
         elevation: 0,
@@ -97,7 +106,9 @@ class AppTheme {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -111,7 +122,9 @@ class AppTheme {
           (states) => states.contains(WidgetState.selected) ? acc : null,
         ),
         trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? acc.withValues(alpha: 0.5) : null,
+          (states) => states.contains(WidgetState.selected)
+              ? acc.withValues(alpha: 0.5)
+              : null,
         ),
       ),
       dialogTheme: DialogThemeData(
@@ -166,8 +179,8 @@ class GameTint {
   final Color secondary;
 
   LinearGradient get gradient => LinearGradient(
-        colors: [primary, secondary],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [primary, secondary],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }

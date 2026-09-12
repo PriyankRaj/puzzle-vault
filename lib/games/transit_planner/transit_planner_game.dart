@@ -24,6 +24,12 @@ final GameDefinition transitPlannerDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF818CF8), Color(0xFF4338CA)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Pick a line above, then drag from station to station to extend it. '
+      'Every station must be touched by some line, and any stations that '
+      'share the same shape must be reachable from one another by walking '
+      'along your drawn lines. Solve it using as few lines as possible for '
+      'more stars.',
   builder: (context, ctx) => TransitPlannerScreen(ctx: ctx),
 );
 
@@ -173,9 +179,9 @@ const List<Offset> _ring12 = [
 /// with 2+ stations of a type) does repeat, which is what makes the
 /// "same-type stations must be mutually reachable" rule meaningful.
 List<_Station> _ring(List<Offset> positions, int phase) => [
-      for (var i = 0; i < positions.length; i++)
-        _Station(positions[i], (i + phase) % 3),
-    ];
+  for (var i = 0; i < positions.length; i++)
+    _Station(positions[i], (i + phase) % 3),
+];
 
 final List<_LevelData> _levels = [
   // Level 1: 5 stations - circles {0,3}, triangles {1,4}, square {2}.
@@ -480,14 +486,21 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
-            Text('Line ${i + 1}', style: TextStyle(color: AppTheme.textPrimary)),
+            Text(
+              'Line ${i + 1}',
+              style: TextStyle(color: AppTheme.textPrimary),
+            ),
             if (drawn) ...[
               const SizedBox(width: 4),
               InkWell(
                 onTap: () => _clearLine(i),
                 child: Padding(
                   padding: const EdgeInsets.all(2),
-                  child: Icon(Icons.close_rounded, size: 16, color: AppTheme.textSecondary),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -517,7 +530,8 @@ class _TransitPainter extends CustomPainter {
       Paint()..color = AppTheme.surfaceHigh,
     );
 
-    Offset px(Offset normalized) => Offset(normalized.dx * size.width, normalized.dy * size.height);
+    Offset px(Offset normalized) =>
+        Offset(normalized.dx * size.width, normalized.dy * size.height);
 
     // Drawn lines, underneath the station shapes.
     for (var i = 0; i < lines.length; i++) {
@@ -529,7 +543,11 @@ class _TransitPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
-      final path = Path()..moveTo(px(data.stations[stationsInLine.first].pos).dx, px(data.stations[stationsInLine.first].pos).dy);
+      final path = Path()
+        ..moveTo(
+          px(data.stations[stationsInLine.first].pos).dx,
+          px(data.stations[stationsInLine.first].pos).dy,
+        );
       for (final idx in stationsInLine.skip(1)) {
         final p = px(data.stations[idx].pos);
         path.lineTo(p.dx, p.dy);
@@ -560,14 +578,23 @@ class _TransitPainter extends CustomPainter {
           canvas.drawPath(path, paint);
           break;
         default: // square
-          final rect = Rect.fromCenter(center: center, width: radius * 1.7, height: radius * 1.7);
-          canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
+          final rect = Rect.fromCenter(
+            center: center,
+            width: radius * 1.7,
+            height: radius * 1.7,
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+            paint,
+          );
       }
       canvas.drawCircle(
         center,
         radius + 2,
         Paint()
-          ..color = flashSuccess ? AppTheme.success : Colors.black.withValues(alpha: 0.25)
+          ..color = flashSuccess
+              ? AppTheme.success
+              : Colors.black.withValues(alpha: 0.25)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
@@ -576,6 +603,7 @@ class _TransitPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TransitPainter oldDelegate) {
-    return oldDelegate.lines != lines || oldDelegate.flashSuccess != flashSuccess;
+    return oldDelegate.lines != lines ||
+        oldDelegate.flashSuccess != flashSuccess;
   }
 }

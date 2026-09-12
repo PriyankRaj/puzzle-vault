@@ -20,6 +20,12 @@ final GameDefinition dungeonLogicDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFF59E0B), Color(0xFF92400E)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Use the arrows to walk around the room. Walk onto a colored key to '
+      'pick it up, then walk into the matching colored door to unlock and '
+      'pass through it (the key is used up). Step onto a numbered switch to '
+      'toggle every gate it controls between open and closed. Reach the '
+      'exit to escape.',
   builder: (context, ctx) => DungeonLogicScreen(ctx: ctx),
 );
 
@@ -54,41 +60,14 @@ class _DungeonLevel {
 const List<_DungeonLevel> _levels = [
   // Level 1: one key, one door. 5x5.
   // Solve: R,R,D,R,D,D,L,R,R (9 moves).
-  _DungeonLevel(
-    [
-      'P.R..',
-      '.....',
-      '..#..',
-      '..r.E',
-      '.....',
-    ],
-    {},
-    9,
-  ),
+  _DungeonLevel(['P.R..', '.....', '..#..', '..r.E', '.....'], {}, 9),
   // Level 2: one key, one door, longer detour. 5x5.
   // Solve: D,D,D,D,R,R,R,U,D,R (10 moves).
-  _DungeonLevel(
-    [
-      'P.#..',
-      '..#..',
-      'R.#..',
-      '..#r.',
-      '....E',
-    ],
-    {},
-    10,
-  ),
+  _DungeonLevel(['P.#..', '..#..', 'R.#..', '..#r.', '....E'], {}, 10),
   // Level 3: one switch, one gate, no keys. 6x6.
   // Solve: R,R,D,D,D,R,R,R,D,D (10 moves).
   _DungeonLevel(
-    [
-      'P..###',
-      '##1###',
-      '##C###',
-      '##....',
-      '#####.',
-      '#####E',
-    ],
+    ['P..###', '##1###', '##C###', '##....', '#####.', '#####E'],
     {
       1: [Point(2, 2)],
     },
@@ -97,28 +76,14 @@ const List<_DungeonLevel> _levels = [
   // Level 4: two keys, two doors in sequence. 6x6.
   // Solve: R,R,D,D,R,D,D,R,D,R (10 moves).
   _DungeonLevel(
-    [
-      'P.R###',
-      '##.###',
-      '##r.##',
-      '###B##',
-      '###.b#',
-      '####.E',
-    ],
+    ['P.R###', '##.###', '##r.##', '###B##', '###.b#', '####.E'],
     {},
     10,
   ),
   // Level 5: a switch/gate followed by a key/door. 6x6.
   // Solve: R,D,D,D,R,D,R,D,R,R (10 moves).
   _DungeonLevel(
-    [
-      'P.####',
-      '#1####',
-      '#C####',
-      '#.R###',
-      '##.r##',
-      '###..E',
-    ],
+    ['P.####', '#1####', '#C####', '#.R###', '##.r##', '###..E'],
     {
       1: [Point(2, 1)],
     },
@@ -127,14 +92,7 @@ const List<_DungeonLevel> _levels = [
   // Level 6: two independent switch/gate pairs in sequence. 6x6.
   // Solve: R,D,D,D,R,D,D,R,R,R (10 moves).
   _DungeonLevel(
-    [
-      'P.####',
-      '#1####',
-      '#C####',
-      '#.2###',
-      '##C###',
-      '##...E',
-    ],
+    ['P.####', '#1####', '#C####', '#.2###', '##C###', '##...E'],
     {
       1: [Point(2, 1)],
       2: [Point(4, 2)],
@@ -365,7 +323,8 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
     _won = false;
   }
 
-  bool _isDigit(String ch) => ch.codeUnitAt(0) >= 49 && ch.codeUnitAt(0) <= 57; // '1'-'9'
+  bool _isDigit(String ch) =>
+      ch.codeUnitAt(0) >= 49 && ch.codeUnitAt(0) <= 57; // '1'-'9'
 
   void _toggleSwitch(int index) {
     final gates = _def.switches[index];
@@ -428,8 +387,8 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
       final stars = _moves == solved
           ? 3
           : _moves <= solved + 4
-              ? 2
-              : 1;
+          ? 2
+          : 1;
       Future.microtask(() => widget.ctx.onComplete(stars: stars));
     }
   }
@@ -484,7 +443,11 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.grid_on_rounded, color: AppTheme.textSecondary, size: 22),
+          child: Icon(
+            Icons.grid_on_rounded,
+            color: AppTheme.textSecondary,
+            size: 22,
+          ),
         );
         break;
       case 'E':
@@ -495,7 +458,11 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.exit_to_app_rounded, color: AppTheme.success, size: 26),
+          child: Icon(
+            Icons.exit_to_app_rounded,
+            color: AppTheme.success,
+            size: 26,
+          ),
         );
         break;
       case 'R':
@@ -536,7 +503,11 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.toggle_on_rounded, color: AppTheme.accent, size: 24),
+          child: Icon(
+            Icons.toggle_on_rounded,
+            color: AppTheme.accent,
+            size: 24,
+          ),
         );
     }
 
@@ -584,7 +555,10 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Moves: $_moves', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Moves: $_moves',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Row(
                   children: [
                     for (final color in ['R', 'B', 'G'])
@@ -603,7 +577,10 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
                     if (_inventory.isEmpty)
                       Text(
                         'No keys held',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                   ],
                 ),
@@ -619,7 +596,9 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
                   child: GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _width * _height,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _width),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: _width,
+                    ),
                     itemBuilder: (context, index) {
                       final r = index ~/ _width;
                       final c = index % _width;

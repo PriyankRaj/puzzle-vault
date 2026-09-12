@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,6 +49,27 @@ void main() {
         expect(def.levelCount, lessThanOrEqualTo(15), reason: def.id);
         expect(def.levelCount, greaterThan(0), reason: def.id);
       }
+    }
+  });
+
+  test('every game has non-empty helpText', () {
+    for (final def in gameRegistry) {
+      expect(def.helpText.trim(), isNotEmpty, reason: def.id);
+    }
+  });
+
+  test('every registered game has a real logic-driving test file', () {
+    // Guards against a future 21st game shipping with only this smoke test
+    // (which proves "boots without crashing", not "the rules actually
+    // work") — see test/games/lights_out_logic_test.dart for the pattern
+    // every other test/games/<id>_logic_test.dart follows.
+    for (final def in gameRegistry) {
+      final file = File('test/games/${def.id}_logic_test.dart');
+      expect(
+        file.existsSync(),
+        isTrue,
+        reason: 'missing test/games/${def.id}_logic_test.dart',
+      );
     }
   });
 }

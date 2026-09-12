@@ -21,6 +21,12 @@ final GameDefinition tacticsGridDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF94A3B8), Color(0xFF334155)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap one of your units, then tap a highlighted tile to move it or a '
+      'red tile to attack an enemy in range. Each unit can move and attack '
+      'once per turn before the enemy squad takes its turn automatically. '
+      'Defeat every enemy unit to win — losing all your units ends the '
+      'battle. Fewer turns earns more stars.',
   builder: (context, ctx) => TacticsGridScreen(ctx: ctx),
 );
 
@@ -83,7 +89,8 @@ IconData _iconOf(_UnitType t) {
 
 /// Chebyshev distance (max of row/col deltas) - used consistently for both
 /// the attack-range stat and the simple line-of-sight-free adjacency check.
-int _dist(Point<int> a, Point<int> b) => max((a.x - b.x).abs(), (a.y - b.y).abs());
+int _dist(Point<int> a, Point<int> b) =>
+    max((a.x - b.x).abs(), (a.y - b.y).abs());
 
 /// Immutable starting-state template for one unit on one level.
 class _UnitSpec {
@@ -117,7 +124,14 @@ class _Unit {
 /// enemy units, and the turn count a hand-traced winning strategy needs
 /// (used only for star grading - never for win/lose logic).
 class _Level {
-  const _Level(this.width, this.height, this.obstacles, this.friendlies, this.enemies, this.optimalTurns);
+  const _Level(
+    this.width,
+    this.height,
+    this.obstacles,
+    this.friendlies,
+    this.enemies,
+    this.optimalTurns,
+  );
   final int width;
   final int height;
   final List<Point<int>> obstacles;
@@ -148,83 +162,97 @@ final List<_Level> _levels = [
   // shuffles 2 tiles toward Guardian, ending at (2,2), no attack landed.
   // T2 - Marksman (still at (3,5)) is now dist3 from Grunt(2,2) - fires
   // again for 4, killing it (4hp -> dead). Win on turn 2.
-  _Level(6, 6, [], [
-    _UnitSpec(_g, 5, 0, 14, 4),
-    _UnitSpec(_m, 5, 5, 8, 4),
-  ], [
-    _UnitSpec(_grunt, 0, 2, 8, 3),
-  ], 2),
+  _Level(
+    6,
+    6,
+    [],
+    [_UnitSpec(_g, 5, 0, 14, 4), _UnitSpec(_m, 5, 5, 8, 4)],
+    [_UnitSpec(_grunt, 0, 2, 8, 3)],
+    2,
+  ),
 
   // Level 2: 1 tougher Grunt (10hp). Same opening: Marksman closes to
   // range and plinks for 4/turn (needs 3 hits: 4,4,2 over-kill on 3rd),
   // Guardian screens/finishes if it gets adjacent. ~3 turns to clear.
-  _Level(6, 6, [], [
-    _UnitSpec(_g, 5, 0, 14, 4),
-    _UnitSpec(_m, 5, 5, 8, 4),
-  ], [
-    _UnitSpec(_grunt, 0, 3, 10, 3),
-  ], 3),
+  _Level(
+    6,
+    6,
+    [],
+    [_UnitSpec(_g, 5, 0, 14, 4), _UnitSpec(_m, 5, 5, 8, 4)],
+    [_UnitSpec(_grunt, 0, 3, 10, 3)],
+    3,
+  ),
 
   // Level 3: 1 Archer (glass cannon, matches Marksman's range3). Marksman
   // closes to exactly range3 turn1 and fires (6->2); Archer, already in
   // range of Marksman without needing to move, fires back for 3 (8->5);
   // turn2 Marksman fires again and kills the 2hp Archer. Win turn 2.
-  _Level(6, 6, [], [
-    _UnitSpec(_g, 5, 2, 14, 4),
-    _UnitSpec(_m, 5, 3, 8, 4),
-  ], [
-    _UnitSpec(_arch, 0, 2, 6, 3),
-  ], 2),
+  _Level(
+    6,
+    6,
+    [],
+    [_UnitSpec(_g, 5, 2, 14, 4), _UnitSpec(_m, 5, 3, 8, 4)],
+    [_UnitSpec(_arch, 0, 2, 6, 3)],
+    2,
+  ),
 
   // Level 4: Grunt + Archer. Marksman focuses the fragile Archer down
   // first (2 hits of 4 kill its 6hp) while Guardian tanks/finishes the
   // Grunt with its own 4 atk over a couple of turns. ~3 turns.
-  _Level(6, 6, [], [
-    _UnitSpec(_g, 5, 1, 14, 4),
-    _UnitSpec(_m, 5, 4, 8, 4),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 10, 3),
-    _UnitSpec(_arch, 0, 4, 6, 3),
-  ], 3),
+  _Level(
+    6,
+    6,
+    [],
+    [_UnitSpec(_g, 5, 1, 14, 4), _UnitSpec(_m, 5, 4, 8, 4)],
+    [_UnitSpec(_grunt, 0, 1, 10, 3), _UnitSpec(_arch, 0, 4, 6, 3)],
+    3,
+  ),
 
   // Level 5: two Grunts, higher atk. Marksman kites and plinks whichever
   // closes first (4 dmg/turn, 3 hits per grunt) while Guardian tanks the
   // other in melee (14hp comfortably absorbs 4 dmg/turn). ~4 turns.
-  _Level(6, 6, [], [
-    _UnitSpec(_g, 5, 1, 14, 4),
-    _UnitSpec(_m, 5, 4, 8, 4),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 10, 4),
-    _UnitSpec(_grunt, 0, 4, 10, 4),
-  ], 4),
+  _Level(
+    6,
+    6,
+    [],
+    [_UnitSpec(_g, 5, 1, 14, 4), _UnitSpec(_m, 5, 4, 8, 4)],
+    [_UnitSpec(_grunt, 0, 1, 10, 4), _UnitSpec(_grunt, 0, 4, 10, 4)],
+    4,
+  ),
 
   // Level 6: Scout joins the squad (7x7). Fast Scout (move4) dashes to
   // help finish the fragile Archer alongside Marksman's ranged fire while
   // Guardian advances on and tanks the Grunt. ~4 turns.
-  _Level(7, 7, [], [
-    _UnitSpec(_g, 6, 0, 14, 4),
-    _UnitSpec(_m, 6, 3, 8, 4),
-    _UnitSpec(_s, 6, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 0, 12, 4),
-    _UnitSpec(_arch, 0, 6, 8, 3),
-  ], 4),
+  _Level(
+    7,
+    7,
+    [],
+    [
+      _UnitSpec(_g, 6, 0, 14, 4),
+      _UnitSpec(_m, 6, 3, 8, 4),
+      _UnitSpec(_s, 6, 6, 7, 3),
+    ],
+    [_UnitSpec(_grunt, 0, 0, 12, 4), _UnitSpec(_arch, 0, 6, 8, 3)],
+    4,
+  ),
 
   // Level 7: two Grunts flanking. Squad splits: Guardian+Marksman collapse
   // the left Grunt (combined 8 dmg/turn kills 12hp in ~2 rounds once
   // engaged), Scout harries the right Grunt with hit-and-run (atk3, move4
   // to disengage between counters) until the rest of the squad regroups
   // to finish it. ~5 turns.
-  _Level(7, 7, [
-    Point(3, 4),
-  ], [
-    _UnitSpec(_g, 6, 0, 14, 4),
-    _UnitSpec(_m, 6, 3, 8, 4),
-    _UnitSpec(_s, 6, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 12, 4),
-    _UnitSpec(_grunt, 0, 5, 12, 4),
-  ], 5),
+  _Level(
+    7,
+    7,
+    [Point(3, 4)],
+    [
+      _UnitSpec(_g, 6, 0, 14, 4),
+      _UnitSpec(_m, 6, 3, 8, 4),
+      _UnitSpec(_s, 6, 6, 7, 3),
+    ],
+    [_UnitSpec(_grunt, 0, 1, 12, 4), _UnitSpec(_grunt, 0, 5, 12, 4)],
+    5,
+  ),
 
   // Level 8: Grunt + Archer, full turn-by-turn trace (obstacle at (3,4)
   // sits off every unit's home column so it never affects a traced path).
@@ -245,122 +273,142 @@ final List<_Level> _levels = [
   // dead. Scout(1,4) attacks adjacent Archer for 3 (5->2). Marksman moves
   // (4,3)->(2,3), now dist2 to Archer, fires for 4 -> Archer 2-4=dead. All
   // enemies down - win on turn 3.
-  _Level(7, 7, [
-    Point(3, 4),
-  ], [
-    _UnitSpec(_g, 6, 1, 14, 4),
-    _UnitSpec(_m, 6, 3, 8, 4),
-    _UnitSpec(_s, 6, 5, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 0, 12, 4),
-    _UnitSpec(_arch, 0, 3, 8, 3),
-  ], 3),
+  _Level(
+    7,
+    7,
+    [Point(3, 4)],
+    [
+      _UnitSpec(_g, 6, 1, 14, 4),
+      _UnitSpec(_m, 6, 3, 8, 4),
+      _UnitSpec(_s, 6, 5, 7, 3),
+    ],
+    [_UnitSpec(_grunt, 0, 0, 12, 4), _UnitSpec(_arch, 0, 3, 8, 3)],
+    3,
+  ),
 
   // Level 9: tougher Grunt+Archer pairing (same shape as level 8, more
   // hp/atk). Same plan - Scout+Marksman erase the Archer while
   // Guardian+Marksman collapse the Grunt - just needs a couple more turns
   // of chip damage. ~5 turns.
-  _Level(7, 7, [
-    Point(3, 4),
-  ], [
-    _UnitSpec(_g, 6, 1, 14, 4),
-    _UnitSpec(_m, 6, 3, 8, 4),
-    _UnitSpec(_s, 6, 5, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 14, 4),
-    _UnitSpec(_arch, 0, 5, 10, 3),
-  ], 5),
+  _Level(
+    7,
+    7,
+    [Point(3, 4)],
+    [
+      _UnitSpec(_g, 6, 1, 14, 4),
+      _UnitSpec(_m, 6, 3, 8, 4),
+      _UnitSpec(_s, 6, 5, 7, 3),
+    ],
+    [_UnitSpec(_grunt, 0, 1, 14, 4), _UnitSpec(_arch, 0, 5, 10, 3)],
+    5,
+  ),
 
   // Level 10: first 3-enemy fight (8x8). Marksman snipes the fragile
   // Archer dead in 2 hits while Guardian tanks/kills the nearer Grunt and
   // Scout mops up the second Grunt with hit-and-run. Combined squad dps
   // (~11/turn) comfortably outpaces the combined 30hp given a few turns
   // to close distance. ~6 turns.
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 12, 4),
-    _UnitSpec(_grunt, 0, 4, 12, 4),
-    _UnitSpec(_arch, 0, 6, 6, 3),
-  ], 6),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_grunt, 0, 1, 12, 4),
+      _UnitSpec(_grunt, 0, 4, 12, 4),
+      _UnitSpec(_arch, 0, 6, 6, 3),
+    ],
+    6,
+  ),
 
   // Level 11: Grunt + Archer + slow Brute. The Brute's move1 makes it easy
   // to out-pace - squad clears the faster Grunt and Archer first (same
   // focus-fire plan as earlier levels) while staying just out of the
   // Brute's move1+range1=2 threat radius, then the whole squad gangs up
   // on the slow Brute once it finally closes in. ~7 turns.
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 0, 14, 4),
-    _UnitSpec(_arch, 0, 4, 8, 3),
-    _UnitSpec(_brute, 0, 7, 18, 4),
-  ], 7),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_grunt, 0, 0, 14, 4),
+      _UnitSpec(_arch, 0, 4, 8, 3),
+      _UnitSpec(_brute, 0, 7, 18, 4),
+    ],
+    7,
+  ),
 
   // Level 12: two Grunts + an Archer. Marksman deletes the Archer first
   // (highest priority glass cannon), then Guardian and Scout each pin a
   // Grunt while Marksman free-fires support shots into whichever Grunt is
   // lower. ~7 turns given the higher atk (5) enemies hit harder.
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-    Point(5, 5),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 14, 5),
-    _UnitSpec(_grunt, 0, 6, 14, 5),
-    _UnitSpec(_arch, 0, 3, 8, 4),
-  ], 7),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5), Point(5, 5)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_grunt, 0, 1, 14, 5),
+      _UnitSpec(_grunt, 0, 6, 14, 5),
+      _UnitSpec(_arch, 0, 3, 8, 4),
+    ],
+    7,
+  ),
 
   // Level 13: Brute + Archer + Grunt. Same "kite the slow Brute, burn the
   // fast squishies first" plan as level 11, now with an extra Grunt adding
   // early pressure - Guardian screens the Grunt while Marksman/Scout erase
   // the Archer, then the full squad converges on the Brute last. ~8 turns.
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-    Point(5, 5),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_brute, 0, 0, 20, 4),
-    _UnitSpec(_arch, 0, 4, 8, 4),
-    _UnitSpec(_grunt, 0, 7, 14, 4),
-  ], 8),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5), Point(5, 5)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_brute, 0, 0, 20, 4),
+      _UnitSpec(_arch, 0, 4, 8, 4),
+      _UnitSpec(_grunt, 0, 7, 14, 4),
+    ],
+    8,
+  ),
 
   // Level 14: two Brutes + an Archer - a double-tank gauntlet. Guardian
   // and Scout each pin down a Brute in melee (both units have enough hp to
   // absorb the Brutes' atk4 for several rounds) while Marksman deletes the
   // Archer at range, then the squad focuses one Brute at a time. ~9 turns.
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-    Point(5, 5),
-    Point(2, 6),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_brute, 0, 1, 20, 4),
-    _UnitSpec(_brute, 0, 6, 20, 4),
-    _UnitSpec(_arch, 0, 3, 10, 4),
-  ], 9),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5), Point(5, 5), Point(2, 6)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_brute, 0, 1, 20, 4),
+      _UnitSpec(_brute, 0, 6, 20, 4),
+      _UnitSpec(_arch, 0, 3, 10, 4),
+    ],
+    9,
+  ),
 
   // Level 15: the hardest fight - Grunt + Archer + Brute all at once, full
   // turn-by-turn trace (obstacles at (3,2)/(4,5) sit off every unit's
@@ -398,18 +446,22 @@ final List<_Level> _levels = [
   // counter-hits along the way, but at least one squad member always
   // survives to land the final blow, which is all the win condition
   // requires).
-  _Level(8, 8, [
-    Point(3, 2),
-    Point(4, 5),
-  ], [
-    _UnitSpec(_g, 7, 1, 14, 4),
-    _UnitSpec(_m, 7, 3, 8, 4),
-    _UnitSpec(_s, 7, 6, 7, 3),
-  ], [
-    _UnitSpec(_grunt, 0, 1, 14, 4),
-    _UnitSpec(_arch, 0, 4, 8, 3),
-    _UnitSpec(_brute, 0, 6, 18, 4),
-  ], 7),
+  _Level(
+    8,
+    8,
+    [Point(3, 2), Point(4, 5)],
+    [
+      _UnitSpec(_g, 7, 1, 14, 4),
+      _UnitSpec(_m, 7, 3, 8, 4),
+      _UnitSpec(_s, 7, 6, 7, 3),
+    ],
+    [
+      _UnitSpec(_grunt, 0, 1, 14, 4),
+      _UnitSpec(_arch, 0, 4, 8, 3),
+      _UnitSpec(_brute, 0, 6, 18, 4),
+    ],
+    7,
+  ),
 ];
 
 enum _Phase { player, enemy, won, lost }
@@ -446,8 +498,14 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
 
   void _reset() {
     _obstacles = _def.obstacles.toSet();
-    _friendlies = [for (final u in _def.friendlies) _Unit(u.type, u.row, u.col, u.hp, u.hp, u.atk)];
-    _enemies = [for (final u in _def.enemies) _Unit(u.type, u.row, u.col, u.hp, u.hp, u.atk)];
+    _friendlies = [
+      for (final u in _def.friendlies)
+        _Unit(u.type, u.row, u.col, u.hp, u.hp, u.atk),
+    ];
+    _enemies = [
+      for (final u in _def.enemies)
+        _Unit(u.type, u.row, u.col, u.hp, u.hp, u.atk),
+    ];
     _turn = 1;
     _phase = _Phase.player;
     _completed = false;
@@ -457,7 +515,9 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
   }
 
   bool _blocked(Point<int> p, List<_Unit> units, _Unit ignore) {
-    if (p.x < 0 || p.x >= _def.height || p.y < 0 || p.y >= _def.width) return true;
+    if (p.x < 0 || p.x >= _def.height || p.y < 0 || p.y >= _def.width) {
+      return true;
+    }
     if (_obstacles.contains(p)) return true;
     for (final u in units) {
       if (u == ignore || !u.alive) continue;
@@ -469,7 +529,11 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
   /// BFS over walkable orthogonal tiles up to [unit]'s move range. Returns
   /// a map from reachable tile to the number of steps used to get there
   /// (the unit's own starting tile is included with 0 steps).
-  Map<Point<int>, int> _reachableSteps(_Unit unit, List<_Unit> allies, List<_Unit> foes) {
+  Map<Point<int>, int> _reachableSteps(
+    _Unit unit,
+    List<_Unit> allies,
+    List<_Unit> foes,
+  ) {
     final all = [...allies, ...foes];
     final start = unit.pos;
     final dist = <Point<int>, int>{start: 0};
@@ -478,7 +542,12 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     while (step < unit.move && frontier.isNotEmpty) {
       final next = <Point<int>>[];
       for (final p in frontier) {
-        for (final d in const [Point(-1, 0), Point(1, 0), Point(0, -1), Point(0, 1)]) {
+        for (final d in const [
+          Point(-1, 0),
+          Point(1, 0),
+          Point(0, -1),
+          Point(0, 1),
+        ]) {
           final np = Point(p.x + d.x, p.y + d.y);
           if (dist.containsKey(np)) continue;
           if (_blocked(np, all, unit)) continue;
@@ -492,7 +561,11 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     return dist;
   }
 
-  Set<Point<int>> _attackableFrom(Point<int> from, int range, List<_Unit> foes) {
+  Set<Point<int>> _attackableFrom(
+    Point<int> from,
+    int range,
+    List<_Unit> foes,
+  ) {
     return {
       for (final f in foes)
         if (f.alive && _dist(from, f.pos) <= range) f.pos,
@@ -558,8 +631,8 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     final stars = _turn <= optimal
         ? 3
         : _turn <= optimal + 2
-            ? 2
-            : 1;
+        ? 2
+        : 1;
     Future.microtask(() => widget.ctx.onComplete(stars: stars));
   }
 
@@ -621,7 +694,8 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
           var bestSteps = 0;
           steps.forEach((tile, s) {
             final rd = _dist(tile, target.pos);
-            if (rd < bestResultDist || (rd == bestResultDist && s < bestSteps)) {
+            if (rd < bestResultDist ||
+                (rd == bestResultDist && s < bestSteps)) {
               bestTile = tile;
               bestResultDist = rd;
               bestSteps = s;
@@ -650,9 +724,11 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
 
   void _onRetry() => setState(_reset);
 
-  _Unit? _friendlyAt(Point<int> p) => _friendlies.where((f) => f.alive && f.pos == p).firstOrNull;
+  _Unit? _friendlyAt(Point<int> p) =>
+      _friendlies.where((f) => f.alive && f.pos == p).firstOrNull;
 
-  _Unit? _enemyAt(Point<int> p) => _enemies.where((e) => e.alive && e.pos == p).firstOrNull;
+  _Unit? _enemyAt(Point<int> p) =>
+      _enemies.where((e) => e.alive && e.pos == p).firstOrNull;
 
   void _onCellTap(int r, int c) {
     if (_phase != _Phase.player) return;
@@ -691,7 +767,10 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
       child: FractionallySizedBox(
         widthFactor: frac,
         child: Container(
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
       ),
     );
@@ -710,7 +789,9 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.85),
             shape: BoxShape.circle,
-            border: selected ? Border.all(color: AppTheme.textPrimary, width: 2) : null,
+            border: selected
+                ? Border.all(color: AppTheme.textPrimary, width: 2)
+                : null,
           ),
           alignment: Alignment.center,
           child: Icon(_iconOf(u.type), size: 16, color: AppTheme.background),
@@ -750,7 +831,9 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(6),
-          border: isReachable || isAttackable ? Border.all(color: bg, width: 1) : null,
+          border: isReachable || isAttackable
+              ? Border.all(color: bg, width: 1)
+              : null,
         ),
         alignment: Alignment.center,
         child: content,
@@ -786,14 +869,28 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Turn: $_turn', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      'Turn: $_turn',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: _phase == _Phase.enemy ? AppTheme.danger.withValues(alpha: 0.2) : AppTheme.accentSoft.withValues(alpha: 0.3),
+                        color: _phase == _Phase.enemy
+                            ? AppTheme.danger.withValues(alpha: 0.2)
+                            : AppTheme.accentSoft.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(bannerText, style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        bannerText,
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                     ElevatedButton(
                       onPressed: _phase == _Phase.player ? _onEndTurn : null,
@@ -811,7 +908,9 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                       child: GridView.builder(
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _def.width * _def.height,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _def.width),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _def.width,
+                        ),
                         itemBuilder: (context, index) {
                           final r = index ~/ _def.width;
                           final c = index % _def.width;
@@ -844,16 +943,29 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shield_rounded, color: AppTheme.danger, size: 40),
+                        Icon(
+                          Icons.shield_rounded,
+                          color: AppTheme.danger,
+                          size: 40,
+                        ),
                         const SizedBox(height: 12),
-                        Text('Your squad was wiped out', style: Theme.of(context).textTheme.titleLarge),
+                        Text(
+                          'Your squad was wiped out',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            ElevatedButton(onPressed: _onRetry, child: const Text('Retry')),
+                            ElevatedButton(
+                              onPressed: _onRetry,
+                              child: const Text('Retry'),
+                            ),
                             const SizedBox(width: 12),
-                            TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
+                            TextButton(
+                              onPressed: widget.ctx.onExit,
+                              child: const Text('Menu'),
+                            ),
                           ],
                         ),
                       ],

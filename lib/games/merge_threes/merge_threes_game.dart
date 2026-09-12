@@ -7,6 +7,8 @@ import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
 import '../../core/progress_store.dart';
+import '../../core/sound.dart';
+import '../../core/widgets/info_tip_button.dart';
 
 /// Original endless tile game: "Triple Merge". Loosely inspired by the
 /// generic "swipe to slide numbered tiles" mechanic family, but with a
@@ -17,6 +19,13 @@ import '../../core/progress_store.dart';
 /// blocking each other, the "Threes"-style twist that sets this apart
 /// from a plain equal-pair merger. Original grid, code and assets — no
 /// third-party branding.
+const String _mergeThreesHelpText =
+    'Swipe to slide every tile in that direction. A lone 1 sliding into a '
+    'lone 2 merges into a 3 — that is the only way to make a 3. From 3 '
+    'onward, two equal tiles merge by doubling, just like a classic merge '
+    'game. Two bare 1s or two bare 2s do NOT merge — they just block each '
+    'other, so save your 1s and 2s for pairing with the other value.';
+
 final GameDefinition mergeThreesDefinition = GameDefinition(
   id: 'merge_threes',
   title: 'Sequence Merge',
@@ -25,6 +34,7 @@ final GameDefinition mergeThreesDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF34D399), Color(0xFF065F46)),
   mode: GameMode.endless,
   levelCount: 1,
+  helpText: _mergeThreesHelpText,
   builder: (context, ctx) => MergeThreesScreen(ctx: ctx),
 );
 
@@ -169,6 +179,43 @@ class _MergeThreesScreenState extends State<MergeThreesScreen> {
     return false;
   }
 
+  Future<void> _confirmReset(BuildContext context) async {
+    Sfx.tap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset Sequence Merge?'),
+          content: const Text(
+            'This clears the best score for this game only. This cannot '
+            'be undone.',
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await ProgressStore.instance.resetGame(widget.ctx.gameId);
+    Sfx.success();
+    if (!context.mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sequence Merge progress has been reset')),
+    );
+  }
+
   Color _tileColor(int value) {
     final colors = {
       0: AppTheme.surface,
@@ -196,6 +243,15 @@ class _MergeThreesScreenState extends State<MergeThreesScreen> {
       appBar: AppBar(
         title: const Text('Sequence Merge'),
         actions: [
+          const InfoTipButton(
+            title: 'Sequence Merge',
+            helpText: _mergeThreesHelpText,
+          ),
+          IconButton(
+            icon: const Icon(Icons.restart_alt_rounded),
+            tooltip: 'Reset progress',
+            onPressed: () => _confirmReset(context),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -208,7 +264,10 @@ class _MergeThreesScreenState extends State<MergeThreesScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text('Score: $_score', style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              'Score: $_score',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           Expanded(
             child: Center(
@@ -257,7 +316,9 @@ class _MergeThreesScreenState extends State<MergeThreesScreen> {
                                 style: TextStyle(
                                   fontSize: value > 512 ? 20 : 24,
                                   fontWeight: FontWeight.w800,
-                                  color: value >= 6 ? Colors.white : AppTheme.textPrimary,
+                                  color: value >= 6
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
                                 ),
                               ),
                       );

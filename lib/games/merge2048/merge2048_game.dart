@@ -7,10 +7,19 @@ import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
 import '../../core/progress_store.dart';
+import '../../core/sound.dart';
+import '../../core/widgets/info_tip_button.dart';
 
 /// Reference implementation: endless tile-merging strategy game, in the
 /// spirit of the classic "2048" mechanic (swipe to merge equal tiles).
 /// Original grid, code and assets — no third-party branding.
+const String _merge2048HelpText =
+    'Swipe up, down, left, or right to slide every tile in that direction. '
+    'Two tiles with the same number merge into one with double the value. '
+    'A new tile appears after each move. The board fills up over time — '
+    'plan merges ahead so you always have somewhere to slide. Reach 2048 '
+    'for the highest honors, or just chase a new best score.';
+
 final GameDefinition merge2048Definition = GameDefinition(
   id: 'merge_2048',
   title: 'Number Merge',
@@ -18,6 +27,7 @@ final GameDefinition merge2048Definition = GameDefinition(
   icon: Icons.grid_4x4_rounded,
   tint: const GameTint(Color(0xFFF5A623), Color(0xFFE8590C)),
   mode: GameMode.endless,
+  helpText: _merge2048HelpText,
   builder: (context, ctx) => Merge2048Screen(ctx: ctx),
 );
 
@@ -138,6 +148,43 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
     return false;
   }
 
+  Future<void> _confirmReset(BuildContext context) async {
+    Sfx.tap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset Number Merge?'),
+          content: const Text(
+            'This clears the best score for this game only. This cannot '
+            'be undone.',
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await ProgressStore.instance.resetGame(widget.ctx.gameId);
+    Sfx.success();
+    if (!context.mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Number Merge progress has been reset')),
+    );
+  }
+
   Color _tileColor(int value) {
     final colors = {
       0: AppTheme.surface,
@@ -163,6 +210,15 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
       appBar: AppBar(
         title: const Text('Number Merge'),
         actions: [
+          const InfoTipButton(
+            title: 'Number Merge',
+            helpText: _merge2048HelpText,
+          ),
+          IconButton(
+            icon: const Icon(Icons.restart_alt_rounded),
+            tooltip: 'Reset progress',
+            onPressed: () => _confirmReset(context),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -175,7 +231,10 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text('Score: $_score', style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              'Score: $_score',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           Expanded(
             child: Center(
@@ -224,7 +283,9 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
                                 style: TextStyle(
                                   fontSize: value > 512 ? 20 : 24,
                                   fontWeight: FontWeight.w800,
-                                  color: value >= 8 ? Colors.white : AppTheme.textPrimary,
+                                  color: value >= 8
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
                                 ),
                               ),
                       );

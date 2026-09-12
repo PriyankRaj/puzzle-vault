@@ -45,7 +45,8 @@ class HomeScreen extends StatelessWidget {
                 crossAxisSpacing: 14,
                 childAspectRatio: 0.92,
               ),
-              itemBuilder: (context, index) => _GameCard(def: gameRegistry[index]),
+              itemBuilder: (context, index) =>
+                  _GameCard(def: gameRegistry[index]),
             ),
           ),
         );
@@ -97,7 +98,10 @@ class _GameCard extends StatelessWidget {
               const Spacer(),
               Text(
                 def.title,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

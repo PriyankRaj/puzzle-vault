@@ -22,6 +22,11 @@ final GameDefinition blockPathDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF22D3EE), Color(0xFF0E7490)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Tap an adjacent block to step onto it. You can only move to a block '
+      'that exists and is at most one elevation level higher or lower than '
+      'the block you\'re standing on. Reach the highlighted goal block — '
+      'fewer steps earns more stars.',
   builder: (context, ctx) => BlockPathScreen(ctx: ctx),
 );
 
@@ -159,7 +164,18 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (4, 4),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'S', 'S', 'W', 'W', 'S', 'S', 'E', 'E', 'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
     ],
   ),
   // Level 9 — same zig-zag shape plus a decorative extra gap.
@@ -174,7 +190,18 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (4, 4),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'S', 'S', 'W', 'W', 'S', 'S', 'E', 'E', 'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
     ],
   ),
   // Level 10 — gates at opposite edges of the 5x5 board.
@@ -189,7 +216,20 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (4, 4),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'E', 'S', 'S', 'W', 'W', 'W', 'S', 'S', 'E', 'E', 'E',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
     ],
   ),
   // Level 11 — first 6x6 board, two nearby gates.
@@ -204,9 +244,7 @@ final List<_LevelSpec> _levels = [
     ],
     start: (0, 0),
     goal: (5, 5),
-    verifiedSolutionSteps: [
-      'E', 'E', 'S', 'S', 'E', 'S', 'S', 'E', 'E', 'S',
-    ],
+    verifiedSolutionSteps: ['E', 'E', 'S', 'S', 'E', 'S', 'S', 'E', 'E', 'S'],
   ),
   // Level 12 — gates near opposite edges plus unused decorative gaps.
   const _LevelSpec(
@@ -220,9 +258,7 @@ final List<_LevelSpec> _levels = [
     ],
     start: (0, 0),
     goal: (5, 5),
-    verifiedSolutionSteps: [
-      'E', 'S', 'S', 'E', 'E', 'E', 'E', 'S', 'S', 'S',
-    ],
+    verifiedSolutionSteps: ['E', 'S', 'S', 'E', 'E', 'E', 'E', 'S', 'S', 'S'],
   ),
   // Level 13 — full-width zig-zag across both edges of the board.
   const _LevelSpec(
@@ -237,9 +273,26 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (5, 5),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'E', 'E', 'S', 'S',
-      'W', 'W', 'W', 'W', 'W', 'S', 'S',
-      'E', 'E', 'E', 'E', 'E', 'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'W',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
     ],
   ),
   // Level 14 — asymmetric gates plus a decorative gap near the goal.
@@ -255,9 +308,24 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (5, 5),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'E', 'S', 'S',
-      'W', 'W', 'W', 'W', 'S', 'S',
-      'E', 'E', 'E', 'E', 'E', 'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
     ],
   ),
   // Level 15 — hardest: gates flanked by gaps on both sides of every
@@ -274,9 +342,22 @@ final List<_LevelSpec> _levels = [
     start: (0, 0),
     goal: (5, 5),
     verifiedSolutionSteps: [
-      'E', 'E', 'E', 'E', 'S', 'S',
-      'W', 'W', 'W', 'S', 'S',
-      'E', 'E', 'E', 'E', 'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
+      'S',
+      'W',
+      'W',
+      'W',
+      'S',
+      'S',
+      'E',
+      'E',
+      'E',
+      'E',
+      'S',
     ],
   ),
 ];
@@ -342,7 +423,8 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     if (cell == _current) return;
 
     final currentElevation = _elevationAt(_current)!;
-    final valid = _isAdjacent(cell, _current) &&
+    final valid =
+        _isAdjacent(cell, _current) &&
         (targetElevation - currentElevation).abs() <= 1;
 
     if (!valid) {
@@ -358,10 +440,10 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     if (_current == _spec.goal) {
       _finished = true;
       final par = _spec.verifiedSolutionSteps.length;
-      final stars = _steps == par
-          ? 3
-          : (_steps <= par + 3 ? 2 : 1);
-      Future.microtask(() => widget.ctx.onComplete(stars: stars, score: _steps));
+      final stars = _steps == par ? 3 : (_steps <= par + 3 ? 2 : 1);
+      Future.microtask(
+        () => widget.ctx.onComplete(stars: stars, score: _steps),
+      );
     }
   }
 
@@ -382,13 +464,15 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     final offsetX = _spec.rows * _tileHalfWidth;
     final offsetY = 3 * _elevationHeight + _tileHalfHeight + 24;
     final x = (c - r) * _tileHalfWidth + offsetX;
-    final y = (c + r) * _tileHalfHeight - elevation * _elevationHeight + offsetY;
+    final y =
+        (c + r) * _tileHalfHeight - elevation * _elevationHeight + offsetY;
     return Offset(x, y);
   }
 
   Size _boardSize() {
     final width = (_spec.rows + _spec.cols) * _tileHalfWidth;
-    final height = (_spec.rows + _spec.cols) * _tileHalfHeight +
+    final height =
+        (_spec.rows + _spec.cols) * _tileHalfHeight +
         3 * _elevationHeight +
         _cubeDepth +
         60;
@@ -435,11 +519,18 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Steps: $_steps', style: Theme.of(context).textTheme.titleMedium),
                 Text(
-                  _finished ? 'Goal reached!' : 'Reach the highlighted goal block',
+                  'Steps: $_steps',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  _finished
+                      ? 'Goal reached!'
+                      : 'Reach the highlighted goal block',
                   style: TextStyle(
-                    color: _finished ? AppTheme.success : AppTheme.textSecondary,
+                    color: _finished
+                        ? AppTheme.success
+                        : AppTheme.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -511,7 +602,10 @@ class _PlayerToken extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppTheme.warning,
-        border: Border.all(color: Colors.black.withValues(alpha: 0.3), width: 1.5),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),

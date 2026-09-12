@@ -4,7 +4,9 @@ import 'package:topgames/home/home_screen.dart';
 import 'package:topgames/main.dart';
 
 void main() {
-  testWidgets('Home screen lists all registered games', (WidgetTester tester) async {
+  testWidgets('Home screen lists all registered games', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const PuzzleVaultApp());
     await tester.pumpAndSettle();
 

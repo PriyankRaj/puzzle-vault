@@ -23,6 +23,12 @@ final GameDefinition slideEscapeDefinition = GameDefinition(
   tint: const GameTint(Color(0xFF60A5FA), Color(0xFF1E3A8A)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'Every block can only slide along its own axis — horizontal blocks '
+      'move left/right, vertical blocks move up/down — and stops the '
+      'moment it hits the grid edge or another block. Drag blocks out of '
+      'the way to clear a path for the highlighted target block to reach '
+      'the exit arrow. Fewer moves earns more stars.',
   builder: (context, ctx) => SlideEscapeScreen(ctx: ctx),
 );
 
@@ -92,7 +98,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 4, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 4,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 3, col: 3),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 2, row: 0, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 0, col: 5),
@@ -104,7 +117,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 0, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 0,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 2, col: 2),
       _BlockSpec(id: 'B', axis: _Axis.vertical, length: 3, row: 3, col: 5),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 3, col: 4),
@@ -121,7 +141,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 4, col: 1, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 4,
+        col: 1,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 3, row: 3, col: 5),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 3, row: 0, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 1, col: 1),
@@ -138,7 +165,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 2, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 2,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 3, row: 1, col: 3),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 3, row: 5, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 2, row: 3, col: 1),
@@ -157,7 +191,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 1, col: 3),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 3, row: 3, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 2, row: 2, col: 2),
@@ -176,7 +217,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 2, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 2,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 3, row: 0, col: 3),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 2, row: 0, col: 1),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 2, row: 4, col: 3),
@@ -197,7 +245,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 3, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 3,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.horizontal, length: 2, row: 4, col: 1),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 3, row: 1, col: 2),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 0, col: 5),
@@ -219,7 +274,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 2, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 2,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 3, row: 0, col: 5),
       _BlockSpec(id: 'B', axis: _Axis.vertical, length: 2, row: 2, col: 2),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 3, row: 0, col: 1),
@@ -241,7 +303,14 @@ const List<_LevelSpec> _levels = [
     rows: 6,
     cols: 6,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 2, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 2,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.horizontal, length: 3, row: 4, col: 2),
       _BlockSpec(id: 'B', axis: _Axis.vertical, length: 2, row: 0, col: 5),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 3, row: 5, col: 0),
@@ -264,7 +333,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 2, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 2,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.horizontal, length: 2, row: 2, col: 0),
       _BlockSpec(id: 'B', axis: _Axis.vertical, length: 2, row: 0, col: 4),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 2, row: 5, col: 4),
@@ -288,7 +364,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 4, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 4,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.horizontal, length: 2, row: 5, col: 5),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 2, row: 2, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 0, col: 6),
@@ -314,7 +397,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 3, row: 3, col: 2, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 3,
+        row: 3,
+        col: 2,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 5, col: 3),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 2, row: 5, col: 4),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 0, col: 0),
@@ -340,7 +430,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 4, col: 3, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 4,
+        col: 3,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 5, col: 0),
       _BlockSpec(id: 'B', axis: _Axis.vertical, length: 3, row: 3, col: 6),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 2, row: 1, col: 1),
@@ -368,7 +465,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 0, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 0,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 0, col: 4),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 2, row: 4, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.horizontal, length: 2, row: 3, col: 3),
@@ -398,7 +502,14 @@ const List<_LevelSpec> _levels = [
     rows: 7,
     cols: 7,
     blocks: [
-      _BlockSpec(id: 'T', axis: _Axis.horizontal, length: 2, row: 1, col: 1, isTarget: true),
+      _BlockSpec(
+        id: 'T',
+        axis: _Axis.horizontal,
+        length: 2,
+        row: 1,
+        col: 1,
+        isTarget: true,
+      ),
       _BlockSpec(id: 'A', axis: _Axis.vertical, length: 2, row: 0, col: 6),
       _BlockSpec(id: 'B', axis: _Axis.horizontal, length: 3, row: 6, col: 3),
       _BlockSpec(id: 'C', axis: _Axis.vertical, length: 3, row: 3, col: 5),
@@ -566,9 +677,7 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
     if (!reached) return;
     setState(() => _won = true);
     final par = _spec.verifiedSolution.length;
-    final stars = _moves == par
-        ? 3
-        : (_moves <= par + 3 ? 2 : 1);
+    final stars = _moves == par ? 3 : (_moves <= par + 3 ? 2 : 1);
     Future.microtask(() => widget.ctx.onComplete(stars: stars, score: _moves));
   }
 
@@ -593,7 +702,10 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Moves: $_moves', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Moves: $_moves',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Text(
                   _won ? 'Escaped!' : 'Slide the target block to the exit',
                   style: TextStyle(
@@ -613,7 +725,9 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
                   final maxBoardHeight = constraints.maxHeight - 32;
                   final cellFromWidth = maxBoardWidth / _spec.cols;
                   final cellFromHeight = maxBoardHeight / _spec.rows;
-                  var cellSize = cellFromWidth < cellFromHeight ? cellFromWidth : cellFromHeight;
+                  var cellSize = cellFromWidth < cellFromHeight
+                      ? cellFromWidth
+                      : cellFromHeight;
                   cellSize = cellSize.clamp(24.0, 64.0);
                   final boardWidth = cellSize * _spec.cols;
                   final boardHeight = cellSize * _spec.rows;
@@ -626,10 +740,12 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
                         SizedBox(
                           width: boardWidth,
                           height: boardHeight,
-                          child: _GridBackground(rows: _spec.rows, cols: _spec.cols),
+                          child: _GridBackground(
+                            rows: _spec.rows,
+                            cols: _spec.cols,
+                          ),
                         ),
-                        for (final b in _spec.blocks)
-                          _buildBlock(b, cellSize),
+                        for (final b in _spec.blocks) _buildBlock(b, cellSize),
                         Positioned(
                           left: boardWidth + 4,
                           top: _target.row * cellSize + cellSize / 2 - 12,
@@ -689,7 +805,9 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDragging ? 0.35 : 0.2),
+                  color: Colors.black.withValues(
+                    alpha: isDragging ? 0.35 : 0.2,
+                  ),
                   blurRadius: isDragging ? 10 : 4,
                   offset: const Offset(0, 2),
                 ),
@@ -719,7 +837,9 @@ class _GridBackground extends StatelessWidget {
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
         itemCount: rows * cols,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: cols),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+        ),
         itemBuilder: (context, index) {
           return Container(
             margin: const EdgeInsets.all(1.5),

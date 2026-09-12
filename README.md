@@ -43,8 +43,14 @@ See `CONTEXT.md` for the IP-safety rationale behind each game.
   settings, and inside every game).
 - Settings: dark mode, sound effects, animations — each independently
   toggleable and persisted.
-- "Reset all progress" with a confirmation dialog.
+- "Reset all progress" (Settings) or "Reset progress" for just one game
+  (level-select AppBar / endless games' own AppBar), each behind a
+  confirmation dialog.
 - Per-game star/lock progress tracked locally, capped at 15 levels per game.
+- "How to play" info tip (ⓘ) on every game — on the level-select screen for
+  the 18 level-based games, and in the AppBar for the two endless games.
+- Real logic-driving tests for every game (`test/games/*.dart`), not just
+  boot smoke tests — most replay a genuine win via the actual UI.
 
 ## Getting started
 
@@ -64,7 +70,8 @@ flutter build apk --debug   # Android sanity build
 `flutter analyze` and a Gradle-cached `flutter build apk` have both been
 observed to miss real compile errors that only a clean `flutter test` run
 catches (see `ARCHITECTURE.md`). Treat `flutter test` as the authoritative
-check.
+check. CI (`.github/workflows/ci.yml`) runs `dart format --set-exit-if-changed`,
+`flutter analyze`, `flutter test`, and a debug APK build on every push/PR.
 
 iOS build has not been verified on this machine (incomplete Xcode Command
 Line Tools install, no full Xcode). The Android target is the verified
@@ -76,3 +83,9 @@ baseline.
   layers work, and why they're built the way they are.
 - `CONTEXT.md` — background for anyone (human or AI) picking this project up
   cold: original intent, constraints, decisions made, and open items.
+- `CHANGELOG.md` — notable changes, in Keep-a-Changelog style.
+- `store/PLAY_STORE_READINESS.md` / `store/APP_STORE_READINESS.md` — store
+  listing copy, visual assets, and submission checklists for each
+  platform, with what's ready vs. what still needs a human decision.
+- `store/PRIVACY_POLICY.md` — drafted privacy policy (the app collects no
+  data); needs to be hosted at a public URL before either store submission.

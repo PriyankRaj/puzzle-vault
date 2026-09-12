@@ -26,6 +26,12 @@ final GameDefinition snipLogicDefinition = GameDefinition(
   tint: const GameTint(Color(0xFFFB923C), Color(0xFF9A3412)),
   mode: GameMode.levels,
   levelCount: 15,
+  helpText:
+      'The parcel hangs from one or more ropes. Tap a rope to sever it — '
+      'cutting the right ropes in the right order lets the parcel swing '
+      'like a pendulum. Time your final cut so it drops into the pulsing '
+      'green target, avoiding obstacles and any moving hazard. Touching a '
+      'hazard loses the parcel; fewer retries earns more stars.',
   builder: (context, ctx) => SnipLogicScreen(ctx: ctx),
 );
 
@@ -47,7 +53,11 @@ class _HazardSpec {
   Rect rectAt(double t) {
     final phase = sin(2 * pi * t / period);
     final center = base + Offset(amplitude.dx * phase, amplitude.dy * phase);
-    return Rect.fromCenter(center: center, width: size.width, height: size.height);
+    return Rect.fromCenter(
+      center: center,
+      width: size.width,
+      height: size.height,
+    );
   }
 }
 
@@ -620,10 +630,10 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
     final statusText = _completed
         ? 'Delivered!'
         : _failed
-            ? 'Lost…'
-            : ropesLeft > 0
-                ? 'Tap a rope to cut it ($ropesLeft left)'
-                : 'Falling…';
+        ? 'Lost…'
+        : ropesLeft > 0
+        ? 'Tap a rope to cut it ($ropesLeft left)'
+        : 'Falling…';
 
     return Scaffold(
       appBar: AppBar(
@@ -652,8 +662,8 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
                     color: _completed
                         ? AppTheme.success
                         : _failed
-                            ? AppTheme.danger
-                            : AppTheme.textSecondary,
+                        ? AppTheme.danger
+                        : AppTheme.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -675,7 +685,10 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
                           animation: _pulseController,
                           builder: (context, _) {
                             return CustomPaint(
-                              size: Size(constraints.maxWidth, constraints.maxHeight),
+                              size: Size(
+                                constraints.maxWidth,
+                                constraints.maxHeight,
+                              ),
                               painter: _SnipLogicPainter(
                                 scale: scale,
                                 spec: _spec,
@@ -748,7 +761,10 @@ class _SnipLogicPainter extends CustomPainter {
     if (hazard != null) {
       final rect = hazard.rectAt(simTime);
       final rr = RRect.fromRectAndRadius(rect, const Radius.circular(6));
-      canvas.drawRRect(rr, Paint()..color = AppTheme.danger.withValues(alpha: 0.85));
+      canvas.drawRRect(
+        rr,
+        Paint()..color = AppTheme.danger.withValues(alpha: 0.85),
+      );
       canvas.drawRRect(
         rr,
         Paint()
@@ -796,7 +812,11 @@ class _SnipLogicPainter extends CustomPainter {
         ..color = Colors.black.withValues(alpha: 0.3)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
-    canvas.drawCircle(parcelPos, _parcelRadius, Paint()..color = AppTheme.accent);
+    canvas.drawCircle(
+      parcelPos,
+      _parcelRadius,
+      Paint()..color = AppTheme.accent,
+    );
     canvas.drawCircle(
       parcelPos,
       _parcelRadius,

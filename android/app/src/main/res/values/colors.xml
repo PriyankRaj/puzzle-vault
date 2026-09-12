@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive icon background: the darker end of the app icon's brand
+         gradient (see assets/icon/icon.png), since an adaptive icon's
+         background layer must be a single flat color/drawable, not a
+         gradient. -->
+    <color name="ic_launcher_background">#1E2982</color>
+</resources>

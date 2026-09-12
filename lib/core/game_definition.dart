@@ -18,6 +18,7 @@ class GameDefinition {
     required this.tint,
     required this.mode,
     this.levelCount = 1,
+    required this.helpText,
     required this.builder,
   });
 
@@ -39,6 +40,11 @@ class GameDefinition {
   /// Number of levels when [mode] is [GameMode.levels]. Capped at 15 per
   /// product requirement. Ignored for endless games.
   final int levelCount;
+
+  /// Plain-language "how to play" instructions shown from an info tip
+  /// (level select for [GameMode.levels] games, in-game for
+  /// [GameMode.endless] games). Keep it short — a few sentences.
+  final String helpText;
 
   /// Builds the gameplay screen for a given [GameLevelContext]. For endless
   /// games this is called once with `level == 1`.
