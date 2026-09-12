@@ -1,6 +1,6 @@
 # Architecture
 
-Puzzle Vault is one Flutter app hosting 19 independent mini-games behind a
+Puzzle Vault is one Flutter app hosting 20 independent mini-games behind a
 shared framework. The framework exists so that theming, settings, sound,
 level progression, and win/fail UX are implemented exactly once, and every
 game just plugs into it.
@@ -48,7 +48,7 @@ GameDefinition(
 )
 ```
 
-`lib/games/registry.dart` lists all 19 definitions in display order — this is
+`lib/games/registry.dart` lists all 20 definitions in display order — this is
 the single source of truth for what appears on the home screen.
 
 A game screen receives a `GameLevelContext` (gameId, level, isEndless,
@@ -86,7 +86,7 @@ applies the level to itself.
   `AppSettingsStore.instance.isDarkMode` so a theme toggle reaches every game
   immediately, not just on next navigation.
 
-Because `GameHost` is the only place all 19 games funnel through, this is
+Because `GameHost` is the only place all 20 games funnel through, this is
 also the only place that had to be touched to make dark/light mode reach
 every game — no per-game plumbing needed.
 
@@ -162,7 +162,7 @@ level-based game was forced through that screen before `GameHost`. Now that
 `HomeScreen` jumps straight into `GameHost` (see below), each game owns its
 own copy of these actions instead. Deliberately **not** implemented by
 having `GameHost` impose a shared `Scaffold` above every game — that would
-change the widget tree above all 19 games at once and risk breaking
+change the widget tree above all 20 games at once and risk breaking
 index-based test finders (e.g. `test/games/tactics_grid_logic_test.dart`'s
 `_cellGestureDetectorOffset`). Each game still builds its own `Scaffold`;
 `gameActions()` is just spread into its existing `AppBar.actions`.
@@ -175,7 +175,7 @@ physics/strategy games (`physics_logic`, `snip_logic`, `ragdoll_trials`,
 `tactics_grid`) give a directional/heuristic nudge instead, since a real
 solver for those was out of scope for this pass.
 
-If you add a 20th game, add `helpText` to its `GameDefinition` and call
+If you add a 21st game, add `helpText` to its `GameDefinition` and call
 `gameActions(...)` in its `AppBar.actions`, passing `onHint` if you can
 give it a real hint.
 

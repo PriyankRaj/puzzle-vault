@@ -23,7 +23,11 @@ Constraints set by the user, in order given:
    explicit go-ahead, dropping the roster to 19. This was a deliberate,
    confirmed exception to constraint 1, not drift — every other game was
    checked against its nearest-looking neighbour and kept because it
-   differed in real input model or win condition, not just theming.
+   differed in real input model or win condition, not just theming. The
+   roster was later restored to 20 with "Code Breaker" (`code_breaker`), an
+   original Mastermind-style deduction puzzle (guess a hidden color
+   sequence, get exact/partial-match feedback, deterministic secret per
+   level) — a genuinely new mechanic, not a re-add of "Sequence Merge".
 2. Local-only persistence, no backend, no network calls of any kind.
 3. Max 15 levels/scenarios per game where levels apply (endless-mode games —
    Number Merge is exempt, it has no "level" concept).

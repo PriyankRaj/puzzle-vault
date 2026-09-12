@@ -74,6 +74,12 @@ to a store yet.
 
 ### Added
 
+- 20th game, **Code Breaker** (`code_breaker`) — an original Mastermind-style
+  deduction puzzle: guess the secret color sequence and use exact/partial-
+  match feedback to crack it within a fixed guess budget. Restores the
+  roster to 20 after "Sequence Merge" was removed as a duplicate of "Number
+  Merge" (see `CONTEXT.md`), with a genuinely new mechanic rather than a
+  re-add.
 - 19 original, offline-only puzzle/logic mini-games behind a shared
   framework (`GameDefinition`, `GameHost`, `LevelSelectScreen`) — see
   `README.md` for the full list.

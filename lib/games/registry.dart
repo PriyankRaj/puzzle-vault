@@ -1,5 +1,6 @@
 import '../core/game_definition.dart';
 import 'block_path/block_path_game.dart';
+import 'code_breaker/code_breaker_game.dart';
 import 'dungeon_logic/dungeon_logic_game.dart';
 import 'defuse_protocol/defuse_protocol_game.dart';
 import 'flow_connect/flow_connect_game.dart';
@@ -41,4 +42,5 @@ final List<GameDefinition> gameRegistry = [
   snipLogicDefinition,
   ragdollTrialsDefinition,
   tacticsGridDefinition,
+  codeBreakerDefinition,
 ];

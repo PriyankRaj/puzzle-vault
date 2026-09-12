@@ -1,6 +1,6 @@
 # Puzzle Vault
 
-A single Flutter app (iOS + Android) bundling 19 original, offline-only puzzle
+A single Flutter app (iOS + Android) bundling 20 original, offline-only puzzle
 and logic mini-games behind one generic shell: home grid, level select,
 settings, and progress persistence.
 
@@ -30,6 +30,7 @@ saves locally on-device via `shared_preferences`.
 | Rope Cut | Cut ropes at the right moment to land the parcel | 15 levels |
 | Tumble Course | Push and tumble the blob to the goal | 15 levels |
 | Squad Battle | Command your squad to victory | 15 levels |
+| Code Breaker | Crack the secret color code before you run out of guesses | 15 levels |
 
 Every game is an original implementation of a generic/public-domain puzzle
 mechanic (or a loosely-inspired original mechanic) — original names (except
@@ -37,10 +38,12 @@ mechanic (or a loosely-inspired original mechanic) — original names (except
 Flutter widgets, no image assets), and original level data. See `CONTEXT.md`
 for the IP-safety rationale behind each game.
 
-A 20th game, "Sequence Merge" ("Threes"-style: slide 1s and 2s together),
-was removed — it shared the same grid, swipe gesture, and slide/merge/spawn
-engine as "Number Merge" (2048-style), differing only in the merge rule. See
-`CONTEXT.md` for the dedup rationale.
+An earlier 20th game, "Sequence Merge" ("Threes"-style: slide 1s and 2s
+together), was removed — it shared the same grid, swipe gesture, and
+slide/merge/spawn engine as "Number Merge" (2048-style), differing only in
+the merge rule. See `CONTEXT.md` for the dedup rationale. The roster was
+later restored to 20 with "Code Breaker", an original Mastermind-style
+deduction puzzle, rather than reintroducing the duplicate.
 
 ## Features
 
@@ -53,7 +56,7 @@ engine as "Number Merge" (2048-style), differing only in the merge rule. See
   confirmation dialog.
 - Per-game star/lock progress tracked locally, capped at 15 levels per game.
 - "How to play" info tip (ⓘ) on every game — on the level-select screen for
-  the 18 level-based games, and in the AppBar for the two endless games.
+  the 19 level-based games, and in the AppBar for the one endless game.
 - Real logic-driving tests for every game (`test/games/*.dart`), not just
   boot smoke tests — most replay a genuine win via the actual UI.
 
