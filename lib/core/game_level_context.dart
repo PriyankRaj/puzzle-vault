@@ -9,6 +9,7 @@ class GameLevelContext {
     required this.isEndless,
     required this.onComplete,
     required this.onExit,
+    this.onOpenLevelSelect,
   });
 
   final String gameId;
@@ -25,4 +26,10 @@ class GameLevelContext {
 
   /// Call to let the player bail out back to level-select / home.
   final VoidCallback onExit;
+
+  /// Opens the level picker without leaving the game screen. Null for
+  /// endless games (there is nothing to pick). Games wire this into their
+  /// own AppBar via `gameActions` rather than requiring a level-select
+  /// screen before every game — see `lib/core/widgets/game_actions.dart`.
+  final VoidCallback? onOpenLevelSelect;
 }

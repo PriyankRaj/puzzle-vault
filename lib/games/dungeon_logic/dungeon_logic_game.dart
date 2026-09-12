@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
+import '../../core/widgets/swipe_area.dart';
 
 /// Original top-down dungeon-room puzzle. The player walks a small grid
 /// room, picking up colored keys to open matching colored doors and
@@ -45,11 +47,22 @@ final GameDefinition dungeonLogicDefinition = GameDefinition(
 /// every gate it controls. [solutionLength] is the exact number of moves in
 /// a hand-verified solving sequence for the level, used only to grade stars.
 class _DungeonLevel {
-  const _DungeonLevel(this.grid, this.switches, this.solutionLength);
+  const _DungeonLevel(
+    this.grid,
+    this.switches,
+    this.solutionLength,
+    this.solutionMoves,
+  );
 
   final List<String> grid;
   final Map<int, List<Point<int>>> switches;
   final int solutionLength;
+
+  /// The exact hand-traced solving sequence transcribed from this level's
+  /// authoring comment above (e.g. `R,R,D,R,D,D,L,R,R`), used to play back
+  /// a real "next move" hint. Assumes the player has followed this exact
+  /// path so far — see `_showHint` for the fallback when they haven't.
+  final List<String> solutionMoves;
 }
 
 /// All 15 rooms, growing from a small single-key 5x5 room to a larger
@@ -60,10 +73,20 @@ class _DungeonLevel {
 const List<_DungeonLevel> _levels = [
   // Level 1: one key, one door. 5x5.
   // Solve: R,R,D,R,D,D,L,R,R (9 moves).
-  _DungeonLevel(['P.R..', '.....', '..#..', '..r.E', '.....'], {}, 9),
+  _DungeonLevel(
+    ['P.R..', '.....', '..#..', '..r.E', '.....'],
+    {},
+    9,
+    ['R', 'R', 'D', 'R', 'D', 'D', 'L', 'R', 'R'],
+  ),
   // Level 2: one key, one door, longer detour. 5x5.
   // Solve: D,D,D,D,R,R,R,U,D,R (10 moves).
-  _DungeonLevel(['P.#..', '..#..', 'R.#..', '..#r.', '....E'], {}, 10),
+  _DungeonLevel(
+    ['P.#..', '..#..', 'R.#..', '..#r.', '....E'],
+    {},
+    10,
+    ['D', 'D', 'D', 'D', 'R', 'R', 'R', 'U', 'D', 'R'],
+  ),
   // Level 3: one switch, one gate, no keys. 6x6.
   // Solve: R,R,D,D,D,R,R,R,D,D (10 moves).
   _DungeonLevel(
@@ -72,6 +95,7 @@ const List<_DungeonLevel> _levels = [
       1: [Point(2, 2)],
     },
     10,
+    ['R', 'R', 'D', 'D', 'D', 'R', 'R', 'R', 'D', 'D'],
   ),
   // Level 4: two keys, two doors in sequence. 6x6.
   // Solve: R,R,D,D,R,D,D,R,D,R (10 moves).
@@ -79,6 +103,7 @@ const List<_DungeonLevel> _levels = [
     ['P.R###', '##.###', '##r.##', '###B##', '###.b#', '####.E'],
     {},
     10,
+    ['R', 'R', 'D', 'D', 'R', 'D', 'D', 'R', 'D', 'R'],
   ),
   // Level 5: a switch/gate followed by a key/door. 6x6.
   // Solve: R,D,D,D,R,D,R,D,R,R (10 moves).
@@ -88,6 +113,7 @@ const List<_DungeonLevel> _levels = [
       1: [Point(2, 1)],
     },
     10,
+    ['R', 'D', 'D', 'D', 'R', 'D', 'R', 'D', 'R', 'R'],
   ),
   // Level 6: two independent switch/gate pairs in sequence. 6x6.
   // Solve: R,D,D,D,R,D,D,R,R,R (10 moves).
@@ -98,6 +124,7 @@ const List<_DungeonLevel> _levels = [
       2: [Point(4, 2)],
     },
     10,
+    ['R', 'D', 'D', 'D', 'R', 'D', 'D', 'R', 'R', 'R'],
   ),
   // Level 7: three keys, three doors in sequence. 7x7.
   // Solve: R,R,D,D,R,D,D,R,D,R,R,D (12 moves).
@@ -113,6 +140,7 @@ const List<_DungeonLevel> _levels = [
     ],
     {},
     12,
+    ['R', 'R', 'D', 'D', 'R', 'D', 'D', 'R', 'D', 'R', 'R', 'D'],
   ),
   // Level 8: a switch/gate combined with a key/door. 7x7.
   // Solve: R,D,D,D,R,D,R,D,R,D (10 moves) - hand-traced:
@@ -132,6 +160,7 @@ const List<_DungeonLevel> _levels = [
       1: [Point(2, 1)],
     },
     10,
+    ['R', 'D', 'D', 'D', 'R', 'D', 'R', 'D', 'R', 'D'],
   ),
   // Level 9: two switches, one of which controls two gates. 7x7.
   // Solve: R,D,D,D,R,R,D,D,R,D,R,R (12 moves).
@@ -150,6 +179,7 @@ const List<_DungeonLevel> _levels = [
       2: [Point(6, 4)],
     },
     12,
+    ['R', 'D', 'D', 'D', 'R', 'R', 'D', 'D', 'R', 'D', 'R', 'R'],
   ),
   // Level 10: two keys/doors combined with a switch/gate. 7x7.
   // Solve: R,R,D,D,R,D,D,D,R,D,R,R (12 moves).
@@ -167,6 +197,7 @@ const List<_DungeonLevel> _levels = [
       1: [Point(4, 3)],
     },
     12,
+    ['R', 'R', 'D', 'D', 'R', 'D', 'D', 'D', 'R', 'D', 'R', 'R'],
   ),
   // Level 11: three keys/doors combined with a switch/gate. 7x7.
   // Solve: R,R,D,D,L,D,D,D,D,R,R,R,U,R,R,U,U,U,U,U (20 moves).
@@ -184,6 +215,28 @@ const List<_DungeonLevel> _levels = [
       1: [Point(5, 1)],
     },
     20,
+    [
+      'R',
+      'R',
+      'D',
+      'D',
+      'L',
+      'D',
+      'D',
+      'D',
+      'D',
+      'R',
+      'R',
+      'R',
+      'U',
+      'R',
+      'R',
+      'U',
+      'U',
+      'U',
+      'U',
+      'U',
+    ],
   ),
   // Level 12: two switches, each controlling two gates, plus a key/door. 8x8.
   // Solve: R,D,D,D,R,R,U,U,R,R,D,D,R,D,D,D,D (17 moves).
@@ -203,6 +256,25 @@ const List<_DungeonLevel> _levels = [
       2: [Point(2, 5)],
     },
     17,
+    [
+      'R',
+      'D',
+      'D',
+      'D',
+      'R',
+      'R',
+      'U',
+      'U',
+      'R',
+      'R',
+      'D',
+      'D',
+      'R',
+      'D',
+      'D',
+      'D',
+      'D',
+    ],
   ),
   // Level 13: three keys/doors plus a switch/gate. 8x8.
   // Solve: R,R,D,D,R,R,D,D,R,R,D,D,L,D,R,R (16 moves).
@@ -221,6 +293,24 @@ const List<_DungeonLevel> _levels = [
       1: [Point(5, 6)],
     },
     16,
+    [
+      'R',
+      'R',
+      'D',
+      'D',
+      'R',
+      'R',
+      'D',
+      'D',
+      'R',
+      'R',
+      'D',
+      'D',
+      'L',
+      'D',
+      'R',
+      'R',
+    ],
   ),
   // Level 14: two switches (each controlling two gates) plus two keys/doors. 8x8.
   // Solve: R,D,D,D,D,R,R,R,U,U,U,R,U,U,R,R,D,D,D,D,D,D,D,D (24 moves).
@@ -240,6 +330,32 @@ const List<_DungeonLevel> _levels = [
       2: [Point(2, 5), Point(1, 5)],
     },
     24,
+    [
+      'R',
+      'D',
+      'D',
+      'D',
+      'D',
+      'R',
+      'R',
+      'R',
+      'U',
+      'U',
+      'U',
+      'R',
+      'U',
+      'U',
+      'R',
+      'R',
+      'D',
+      'D',
+      'D',
+      'D',
+      'D',
+      'D',
+      'D',
+      'D',
+    ],
   ),
   // Level 15: three keys/doors plus two switches each controlling two gates.
   // The largest, hardest room. 8x8.
@@ -267,6 +383,37 @@ const List<_DungeonLevel> _levels = [
       2: [Point(2, 7), Point(2, 5)],
     },
     29,
+    [
+      'R',
+      'R',
+      'D',
+      'D',
+      'L',
+      'D',
+      'D',
+      'D',
+      'D',
+      'R',
+      'R',
+      'R',
+      'R',
+      'R',
+      'R',
+      'U',
+      'U',
+      'U',
+      'U',
+      'L',
+      'L',
+      'L',
+      'L',
+      'U',
+      'U',
+      'R',
+      'R',
+      'R',
+      'R',
+    ],
   ),
 ];
 
@@ -393,17 +540,70 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
     }
   }
 
-  Widget _dpadButton(IconData icon, int dr, int dc) {
+  Widget _dpadButton(IconData icon, int dr, int dc, String label) {
     return IconButton(
       onPressed: () => _move(dr, dc),
       icon: Icon(icon, color: AppTheme.textPrimary),
       style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceHigh),
+      tooltip: 'Move $label',
     );
   }
 
-  Widget _buildCell(int r, int c) {
+  /// Routes a swipe to the same [_move] call the d-pad buttons use, so
+  /// swiping the board is exactly equivalent to pressing the matching
+  /// d-pad button (additive — the d-pad still works too).
+  void _onSwipe(SwipeDirection direction) {
+    switch (direction) {
+      case SwipeDirection.left:
+        _move(0, -1);
+      case SwipeDirection.right:
+        _move(0, 1);
+      case SwipeDirection.up:
+        _move(-1, 0);
+      case SwipeDirection.down:
+        _move(1, 0);
+    }
+  }
+
+  /// Plays back the next move of this level's hand-traced solution
+  /// (transcribed from the authoring comment into `solutionMoves`), based
+  /// on how many moves the player has made so far. This assumes the
+  /// player has followed that exact optimal path — if they've deviated,
+  /// `_moves` no longer indexes the right step, so we fall back to
+  /// replaying the FIRST move as a general nudge rather than risk showing
+  /// (or performing) a move that's wrong for their actual position. Same
+  /// known limitation as `slide_escape`'s stored solution elsewhere in
+  /// this app.
+  void _showHint() {
+    if (_won) return;
+    final moves = _def.solutionMoves;
+    if (moves.isEmpty) return;
+    final index = _moves < moves.length ? _moves : 0;
+    final move = moves[index];
+    final (dr, dc) = switch (move) {
+      'U' => (-1, 0),
+      'D' => (1, 0),
+      'L' => (0, -1),
+      'R' => (0, 1),
+      _ => (0, 0),
+    };
+    final directionName = switch (move) {
+      'U' => 'up',
+      'D' => 'down',
+      'L' => 'left',
+      _ => 'right',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Try moving $directionName.')));
+    _move(dr, dc);
+  }
+
+  Widget _buildCell(int r, int c, double cellSize) {
     final ch = _cell[r][c];
     final hasPlayer = r == _playerRow && c == _playerCol;
+    final iconSize = (cellSize * 0.5).clamp(18.0, 32.0);
+    final playerDotSize = (cellSize * 0.35).clamp(14.0, 24.0);
 
     Widget base;
     switch (ch) {
@@ -446,7 +646,7 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
           child: Icon(
             Icons.grid_on_rounded,
             color: AppTheme.textSecondary,
-            size: 22,
+            size: iconSize,
           ),
         );
         break;
@@ -461,7 +661,7 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
           child: Icon(
             Icons.exit_to_app_rounded,
             color: AppTheme.success,
-            size: 26,
+            size: iconSize,
           ),
         );
         break;
@@ -476,7 +676,7 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.key_rounded, color: color, size: 24),
+          child: Icon(Icons.key_rounded, color: color, size: iconSize),
         );
         break;
       case 'r':
@@ -491,7 +691,11 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             border: Border.all(color: color, width: 2),
           ),
           alignment: Alignment.center,
-          child: Icon(Icons.door_front_door_rounded, color: color, size: 24),
+          child: Icon(
+            Icons.door_front_door_rounded,
+            color: color,
+            size: iconSize,
+          ),
         );
         break;
       default:
@@ -506,7 +710,7 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
           child: Icon(
             Icons.toggle_on_rounded,
             color: AppTheme.accent,
-            size: 24,
+            size: iconSize,
           ),
         );
     }
@@ -525,8 +729,8 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
           ),
         ),
         Container(
-          width: 18,
-          height: 18,
+          width: playerDotSize,
+          height: playerDotSize,
           decoration: BoxDecoration(
             color: AppTheme.accent,
             shape: BoxShape.circle,
@@ -542,6 +746,12 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
       appBar: AppBar(
         title: Text('Dungeon Logic · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: dungeonLogicDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -566,8 +776,8 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
                         Padding(
                           padding: const EdgeInsets.only(left: 6),
                           child: Container(
-                            width: 14,
-                            height: 14,
+                            width: 16,
+                            height: 16,
                             decoration: BoxDecoration(
                               color: _keyColors[color],
                               shape: BoxShape.circle,
@@ -588,22 +798,31 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             ),
           ),
           Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _width / _height,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _width * _height,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _width,
+            child: SwipeArea(
+              onSwipe: _onSwipe,
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: _width / _height,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cellSize = constraints.maxWidth / _width;
+                        return GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _width * _height,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: _width,
+                              ),
+                          itemBuilder: (context, index) {
+                            final r = index ~/ _width;
+                            final c = index % _width;
+                            return _buildCell(r, c, cellSize);
+                          },
+                        );
+                      },
                     ),
-                    itemBuilder: (context, index) {
-                      final r = index ~/ _width;
-                      final c = index % _width;
-                      return _buildCell(r, c);
-                    },
                   ),
                 ),
               ),
@@ -614,16 +833,26 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _dpadButton(Icons.keyboard_arrow_up_rounded, -1, 0),
+                _dpadButton(Icons.keyboard_arrow_up_rounded, -1, 0, 'up'),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _dpadButton(Icons.keyboard_arrow_left_rounded, 0, -1),
+                    _dpadButton(
+                      Icons.keyboard_arrow_left_rounded,
+                      0,
+                      -1,
+                      'left',
+                    ),
                     const SizedBox(width: 48),
-                    _dpadButton(Icons.keyboard_arrow_right_rounded, 0, 1),
+                    _dpadButton(
+                      Icons.keyboard_arrow_right_rounded,
+                      0,
+                      1,
+                      'right',
+                    ),
                   ],
                 ),
-                _dpadButton(Icons.keyboard_arrow_down_rounded, 1, 0),
+                _dpadButton(Icons.keyboard_arrow_down_rounded, 1, 0, 'down'),
               ],
             ),
           ),

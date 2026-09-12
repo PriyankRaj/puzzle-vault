@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: classic 9x9 Sudoku (public domain mechanic).
 /// A full solved grid is built deterministically from a base pattern and a
@@ -13,7 +14,7 @@ import '../../core/game_level_context.dart';
 /// to form the puzzle. 15 levels, blank count scales with difficulty.
 final GameDefinition sudokuDefinition = GameDefinition(
   id: 'sudoku',
-  title: 'Number Grid',
+  title: 'Sudoku',
   tagline: 'Classic 9x9 number logic',
   icon: Icons.apps_rounded,
   tint: const GameTint(Color(0xFF60A5FA), Color(0xFF2563EB)),
@@ -180,12 +181,42 @@ class _SudokuScreenState extends State<SudokuScreen> {
 
   void _erase() => _enterDigit(0);
 
+  /// Fills in one currently-wrong (or blank) non-given cell with its true
+  /// solution digit, routed through [_enterDigit] so it runs the exact same
+  /// mistake-tracking / completion-check / `onComplete` path as a manual
+  /// numpad tap — completing the puzzle purely via hints still finishes the
+  /// level correctly.
+  void _showHint() {
+    for (var r = 0; r < _side; r++) {
+      for (var c = 0; c < _side; c++) {
+        if (_given[r][c]) continue;
+        if (_board[r][c] != _solution[r][c]) {
+          setState(() {
+            _selectedRow = r;
+            _selectedCol = c;
+          });
+          _enterDigit(_solution[r][c]);
+          return;
+        }
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Nothing left to hint — you're done!")),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: sudokuDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -206,29 +237,35 @@ class _SudokuScreenState extends State<SudokuScreen> {
               child: AspectRatio(
                 aspectRatio: 1,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceHigh,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.textSecondary,
-                        width: 2,
-                      ),
-                    ),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _side * _side,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: _side,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cellSize = constraints.maxWidth / _side;
+                      final fontSize = (cellSize * 0.45).clamp(14.0, 26.0);
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceHigh,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.textSecondary,
+                            width: 2,
                           ),
-                      itemBuilder: (context, index) {
-                        final r = index ~/ _side;
-                        final c = index % _side;
-                        return _buildCell(r, c);
-                      },
-                    ),
+                        ),
+                        child: GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _side * _side,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: _side,
+                              ),
+                          itemBuilder: (context, index) {
+                            final r = index ~/ _side;
+                            final c = index % _side;
+                            return _buildCell(r, c, fontSize);
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -250,7 +287,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
     );
   }
 
-  Widget _buildCell(int r, int c) {
+  Widget _buildCell(int r, int c, double fontSize) {
     final value = _board[r][c];
     final given = _given[r][c];
     final selected = r == _selectedRow && c == _selectedCol;
@@ -302,7 +339,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
             : Text(
                 '$value',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: fontSize,
                   fontWeight: given ? FontWeight.w800 : FontWeight.w500,
                   color: textColor,
                 ),

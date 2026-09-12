@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation notes:
 ///
@@ -1113,17 +1114,20 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
     _activeColor = null;
   }
 
-  Point<int>? _cellFromOffset(Offset local, double cellSize) {
-    final gx = (local.dx / cellSize).floor();
-    final gy = (local.dy / cellSize).floor();
-    if (gx < 0 || gx >= _data.size || gy < 0 || gy >= _data.size) return null;
+  /// Converts a raw pointer position (relative to the canvas, i.e. already
+  /// offset past the surrounding padding by the caller) into a grid cell.
+  /// Clamped rather than rejected outside [0, size) so a drag that starts
+  /// or wanders into the padding ring around the board still resolves to
+  /// the nearest valid cell instead of being silently dropped.
+  Point<int> _cellFromOffset(Offset local, double cellSize) {
+    final gx = (local.dx / cellSize).floor().clamp(0, _data.size - 1);
+    final gy = (local.dy / cellSize).floor().clamp(0, _data.size - 1);
     return Point(gx, gy);
   }
 
   void _handlePanStart(Offset local, double cellSize) {
     if (_won) return;
     final cell = _cellFromOffset(local, cellSize);
-    if (cell == null) return;
 
     final endpointColor = _colorAtEndpoint(cell);
     if (endpointColor == -1) return;
@@ -1153,7 +1157,6 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
     final color = _activeColor;
     if (color == null) return;
     final cell = _cellFromOffset(local, cellSize);
-    if (cell == null) return;
 
     final pipe = _pipes[color];
     if (pipe == null || pipe.isEmpty) return;
@@ -1229,12 +1232,85 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
     });
   }
 
+  /// Reveals one step of the verified reference [_LevelData.solution] for
+  /// the first still-incomplete color: the next cell beyond wherever the
+  /// player's current (possibly partial) pipe for that color currently
+  /// ends.
+  void _showHint() {
+    if (_won) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This level is already solved!')),
+      );
+      return;
+    }
+
+    _Pair? target;
+    for (final pair in _data.pairs) {
+      if (!_completedColors.contains(pair.color)) {
+        target = pair;
+        break;
+      }
+    }
+    if (target == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Every pipe is already connected!')),
+      );
+      return;
+    }
+
+    final color = target.color;
+    final solutionIndex = _data.pairs.indexOf(target);
+    final solutionPath = _data.solution[solutionIndex];
+    final currentPipe = _pipes[color];
+    final lastCell = (currentPipe != null && currentPipe.isNotEmpty)
+        ? currentPipe.last
+        : target.a;
+
+    // Solution paths are recorded starting at `pair.a`. If the player
+    // instead started this pipe from `pair.b`, walk the path in reverse.
+    var idx = solutionPath.indexOf(lastCell);
+    var path = solutionPath;
+    if (idx == -1 || idx >= path.length - 1) {
+      final reversedPath = solutionPath.reversed.toList();
+      final reversedIdx = reversedPath.indexOf(lastCell);
+      if (reversedIdx != -1 && reversedIdx < reversedPath.length - 1) {
+        idx = reversedIdx;
+        path = reversedPath;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'That pipe has wandered off the reference path — try '
+              'clearing it and starting over from an endpoint.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    final next = path[idx + 1];
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Extend pipe ${color + 1} toward row ${next.y + 1}, '
+          'column ${next.x + 1}.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Level ${widget.ctx.level}'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: flowConnectDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -1255,19 +1331,31 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = constraints.maxWidth;
-                      final cellSize = size / _data.size;
-                      return GestureDetector(
-                        onPanStart: (d) =>
-                            _handlePanStart(d.localPosition, cellSize),
-                        onPanUpdate: (d) =>
-                            _handlePanUpdate(d.localPosition, cellSize),
-                        onPanEnd: (_) => _handlePanEnd(),
-                        onPanCancel: _handlePanEnd,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const boardPadding = 24.0;
+                    final outerSize = constraints.maxWidth;
+                    final size = outerSize - boardPadding * 2;
+                    final cellSize = size / _data.size;
+                    // GestureDetector wraps the Padding (rather than the
+                    // reverse) and is `opaque`, so its hit-test area is the
+                    // full outer square, including the padding ring — a
+                    // drag starting there no longer misses the board
+                    // entirely. `localPosition` is now relative to that
+                    // outer edge, so it's shifted back by `boardPadding`
+                    // before being converted to canvas/cell coordinates.
+                    Offset toCanvas(Offset local) =>
+                        local - const Offset(boardPadding, boardPadding);
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (d) =>
+                          _handlePanStart(toCanvas(d.localPosition), cellSize),
+                      onPanUpdate: (d) =>
+                          _handlePanUpdate(toCanvas(d.localPosition), cellSize),
+                      onPanEnd: (_) => _handlePanEnd(),
+                      onPanCancel: _handlePanEnd,
+                      child: Padding(
+                        padding: const EdgeInsets.all(boardPadding),
                         child: CustomPaint(
                           size: Size(size, size),
                           painter: _FlowConnectPainter(
@@ -1276,9 +1364,9 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
                             completedColors: _completedColors,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

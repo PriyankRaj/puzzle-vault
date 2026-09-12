@@ -42,7 +42,16 @@ Future<void> _tapCell(
     matching: find.byType(GestureDetector),
   );
   final origin = tester.getTopLeft(finder.first);
-  final local = _cellOffset(rows, r, c, elevation);
+  // The board is now responsively scaled to fill available space (see
+  // `BlockPathScreen.build`'s `LayoutBuilder`), so the rendered board is no
+  // longer necessarily at the game's natural/unscaled tile size. Derive the
+  // actual scale factor from the rendered size vs. the natural size (both
+  // known to be square boards in these tests, `rows == cols`) and apply it
+  // to the natural-size cell offset, rather than assuming scale == 1.
+  final renderedWidth = tester.getSize(finder.first).width;
+  final naturalWidth = (rows + rows) * _tileHalfWidth;
+  final scale = renderedWidth / naturalWidth;
+  final local = _cellOffset(rows, r, c, elevation) * scale;
   await tester.tapAt(origin + local);
   await tester.pump();
 }

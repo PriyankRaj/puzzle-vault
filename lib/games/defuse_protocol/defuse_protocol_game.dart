@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: an original solo rule-manual deduction puzzle.
 /// The player is shown a short on-screen "manual" rule and a module with
@@ -62,6 +63,16 @@ const List<IconData> _keypadIconPool = [
   Icons.square_rounded,
   Icons.favorite,
 ];
+
+/// Human-readable names for the keypad icon pool, used only by the hint
+/// text so it can describe the correct key without showing the icon glyph.
+final Map<IconData, String> _keypadIconNames = {
+  Icons.star_rounded: 'star',
+  Icons.circle: 'circle',
+  Icons.change_history_rounded: 'triangle',
+  Icons.square_rounded: 'square',
+  Icons.favorite: 'heart',
+};
 
 /// One wire-cutting module instance.
 class _WireModule {
@@ -441,6 +452,75 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
     );
   }
 
+  /// Reveals the exact correct action for the currently active module,
+  /// derived from that module's own solution field (never boilerplate
+  /// help text) — see `_WireModule.correctIndex`, `_KeypadModule
+  /// .correctIcon`, and `_ToggleModule.isCorrect` above.
+  void _showHint() {
+    if (_moduleIndex >= _modules.length) return;
+    final module = _modules[_moduleIndex];
+    String message;
+    switch (module.type) {
+      case _ModuleType.wire:
+        final wire = module.wire!;
+        message =
+            'Cut the ${_ordinal(wire.correctIndex + 1)} wire '
+            '(${_wireColorName(wire.colors[wire.correctIndex])}).';
+      case _ModuleType.keypad:
+        final keypad = module.keypad!;
+        final name = _keypadIconNames[keypad.correctIcon] ?? 'highlighted';
+        message = 'Press the $name key.';
+      case _ModuleType.toggle:
+        final toggle = module.toggle!;
+        final states = _toggleLiveStates ?? toggle.initialStates;
+        if (toggle.ruleId == 0) {
+          // Rule: end with an EVEN number of ON switches. Any state with
+          // even ON-count satisfies it, so the minimal hint from the
+          // CURRENT live state is: flip one switch if the count is
+          // currently odd, otherwise nothing needs to change.
+          final onCount = states.where((s) => s).length;
+          if (onCount.isEven) {
+            message = 'The ON-count is already even — just confirm.';
+          } else {
+            final flipIndex = states.indexWhere((s) => s) != -1
+                ? states.indexWhere((s) => s)
+                : 0;
+            final toState = states[flipIndex] ? 'OFF' : 'ON';
+            message =
+                'Flip switch ${flipIndex + 1} to $toState to make the '
+                'ON-count even, then confirm.';
+          }
+        } else {
+          // Rule: every switch must end ON.
+          final offIndexes = <int>[];
+          for (var i = 0; i < states.length; i++) {
+            if (!states[i]) offIndexes.add(i + 1);
+          }
+          message = offIndexes.isEmpty
+              ? 'All switches are already ON — just confirm.'
+              : 'Flip switch${offIndexes.length > 1 ? 'es' : ''} '
+                    '${offIndexes.join(', ')} to ON, then confirm.';
+        }
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _ordinal(int n) {
+    if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
+    switch (n % 10) {
+      case 1:
+        return '${n}st';
+      case 2:
+        return '${n}nd';
+      case 3:
+        return '${n}rd';
+      default:
+        return '${n}th';
+    }
+  }
+
   // ---- UI ------------------------------------------------------------
 
   @override
@@ -457,6 +537,12 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
       appBar: AppBar(
         title: Text('Defuse Protocol · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: defuseProtocolDefinition,
+            ctx: widget.ctx,
+            onHint: isComplete ? null : _showHint,
+          ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
@@ -564,19 +650,19 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
 
   Widget _buildWireModule(_WireModule module) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           for (var i = 0; i < module.colors.length; i++)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: GestureDetector(
                 onTap: () => _onWireTap(i),
                 child: Column(
                   children: [
                     Container(
-                      width: 28,
+                      width: 44,
                       height: 140,
                       decoration: BoxDecoration(
                         color: module.colors[i],
@@ -611,31 +697,40 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
   }
 
   Widget _buildKeypadModule(_KeypadModule module) {
-    return SizedBox(
-      width: 260,
-      height: 260,
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: module.icons.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-        ),
-        itemBuilder: (context, index) {
-          final icon = module.icons[index];
-          return GestureDetector(
-            onTap: () => _onKeypadTap(icon),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceHigh,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppTheme.accent, size: 30),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = min(constraints.maxWidth, 340.0);
+        return SizedBox(
+          width: size,
+          height: size,
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: module.icons.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
             ),
-          );
-        },
-      ),
+            itemBuilder: (context, index) {
+              final icon = module.icons[index];
+              return GestureDetector(
+                onTap: () => _onKeypadTap(icon),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppTheme.accent,
+                    size: size / 260 * 30,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

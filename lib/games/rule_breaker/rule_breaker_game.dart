@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
+import '../../core/widgets/swipe_area.dart';
 
 /// Original rule-block pushing puzzle. Word-tiles like WALL / IS / STOP sit
 /// on the grid alongside ordinary shaped objects (wall, box, rock, flag) and
@@ -300,6 +302,36 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
     }
   }
 
+  void _onSwipe(SwipeDirection direction) {
+    switch (direction) {
+      case SwipeDirection.left:
+        _move(0, -1);
+      case SwipeDirection.right:
+        _move(0, 1);
+      case SwipeDirection.up:
+        _move(-1, 0);
+      case SwipeDirection.down:
+        _move(1, 0);
+    }
+  }
+
+  /// This game's rules mutate mid-play (pushing word-tiles rewrites what's
+  /// walkable), so a real "next correct move" hint needs a search over that
+  /// changing rule set — out of scope here. The undo stack already exists
+  /// for the cheaper consolation: nudge the player toward re-reading the
+  /// active rules rather than guessing blind.
+  void _showHint() {
+    final labels = _activeRuleLabels();
+    final message = labels.isEmpty
+        ? 'No rules are active yet — push word-tiles into a row to form '
+              'NOUN IS PROPERTY.'
+        : 'Active rules: ${labels.join(', ')}. Look for a WIN tile, or push '
+              'a word out of formation to break a rule blocking your path.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _move(int dr, int dc) {
     if (_won) return;
     final nr = _player.row + dr;
@@ -486,11 +518,12 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
     );
   }
 
-  Widget _dpadButton(IconData icon, int dr, int dc) {
+  Widget _dpadButton(IconData icon, int dr, int dc, String label) {
     return IconButton(
       onPressed: () => _move(dr, dc),
       icon: Icon(icon, color: AppTheme.textPrimary),
       style: IconButton.styleFrom(backgroundColor: AppTheme.surfaceHigh),
+      tooltip: 'Move $label',
     );
   }
 
@@ -501,6 +534,12 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: ruleBreakerDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -563,22 +602,13 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
             ),
           ),
           Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _width / _height,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: GestureDetector(
-                    onHorizontalDragEnd: (details) {
-                      final v = details.primaryVelocity ?? 0;
-                      if (v.abs() < 100) return;
-                      _move(0, v > 0 ? 1 : -1);
-                    },
-                    onVerticalDragEnd: (details) {
-                      final v = details.primaryVelocity ?? 0;
-                      if (v.abs() < 100) return;
-                      _move(v > 0 ? 1 : -1, 0);
-                    },
+            child: SwipeArea(
+              onSwipe: _onSwipe,
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: _width / _height,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
                     child: GridView.builder(
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _width * _height,
@@ -601,16 +631,26 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _dpadButton(Icons.keyboard_arrow_up_rounded, -1, 0),
+                _dpadButton(Icons.keyboard_arrow_up_rounded, -1, 0, 'up'),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _dpadButton(Icons.keyboard_arrow_left_rounded, 0, -1),
+                    _dpadButton(
+                      Icons.keyboard_arrow_left_rounded,
+                      0,
+                      -1,
+                      'left',
+                    ),
                     const SizedBox(width: 48),
-                    _dpadButton(Icons.keyboard_arrow_right_rounded, 0, 1),
+                    _dpadButton(
+                      Icons.keyboard_arrow_right_rounded,
+                      0,
+                      1,
+                      'right',
+                    ),
                   ],
                 ),
-                _dpadButton(Icons.keyboard_arrow_down_rounded, 1, 0),
+                _dpadButton(Icons.keyboard_arrow_down_rounded, 1, 0, 'down'),
               ],
             ),
           ),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: an original dot-grid path puzzle. The player
 /// traces a single line from a fixed start dot to a fixed end dot along
@@ -423,6 +424,52 @@ class _LineTraceScreenState extends State<LineTraceScreen> {
     if (_isComplete) _checkSolution();
   }
 
+  /// Finalizes a drag that ended (lift or system cancel) without reaching
+  /// [_LevelData.end]: since tracing is meant to be one continuous stroke
+  /// from start to end, an incomplete release abandons the partial trace
+  /// (counted as a failed attempt), matching [_clear]'s bookkeeping. A
+  /// completed path is already handled by [_checkSolution] before the pan
+  /// ever ends, so this is a no-op in that case.
+  void _handlePanEnd() {
+    if (_locked) return;
+    if (_path.length <= 1) return;
+    if (_isComplete) return;
+    setState(() {
+      _failedAttempts++;
+      _path = [_data.start];
+      _flashCells = {};
+      _flashColor = null;
+    });
+  }
+
+  /// Reveals the next dot beyond wherever the player's current path
+  /// currently ends, taken from the verified reference [_LevelData.solution].
+  void _showHint() {
+    if (_locked || _isComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This level looks complete!')),
+      );
+      return;
+    }
+    final lastDot = _path.last;
+    final idx = _data.solution.indexOf(lastDot);
+    if (idx == -1 || idx >= _data.solution.length - 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your path has drifted from the reference route — try Clear '
+            'and retrace from the start dot for a hint.',
+          ),
+        ),
+      );
+      return;
+    }
+    final next = _data.solution[idx + 1];
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Trace toward dot (${next.x}, ${next.y}) next.')),
+    );
+  }
+
   void _clear() {
     if (_locked) return;
     setState(() {
@@ -533,6 +580,12 @@ class _LineTraceScreenState extends State<LineTraceScreen> {
       appBar: AppBar(
         title: Text('Level ${widget.ctx.level}'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: lineTraceDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -552,17 +605,31 @@ class _LineTraceScreenState extends State<LineTraceScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = constraints.maxWidth;
-                      final cellSize = size / (_data.dotsX - 1);
-                      return GestureDetector(
-                        onPanStart: (d) =>
-                            _handleTouch(d.localPosition, cellSize),
-                        onPanUpdate: (d) =>
-                            _handleTouch(d.localPosition, cellSize),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const boardPadding = 24.0;
+                    final outerSize = constraints.maxWidth;
+                    final size = outerSize - boardPadding * 2;
+                    final cellSize = size / (_data.dotsX - 1);
+                    // GestureDetector wraps the Padding (rather than the
+                    // reverse) and is `opaque`, so its hit-test area is the
+                    // full outer square, including the padding ring — a
+                    // drag starting there no longer misses the board
+                    // entirely. `localPosition` is relative to that outer
+                    // edge, so it's shifted back by `boardPadding` before
+                    // being converted to dot coordinates.
+                    Offset toCanvas(Offset local) =>
+                        local - const Offset(boardPadding, boardPadding);
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (d) =>
+                          _handleTouch(toCanvas(d.localPosition), cellSize),
+                      onPanUpdate: (d) =>
+                          _handleTouch(toCanvas(d.localPosition), cellSize),
+                      onPanEnd: (_) => _handlePanEnd(),
+                      onPanCancel: _handlePanEnd,
+                      child: Padding(
+                        padding: const EdgeInsets.all(boardPadding),
                         child: CustomPaint(
                           size: Size(size, size),
                           painter: _LineTracePainter(
@@ -572,9 +639,9 @@ class _LineTraceScreenState extends State<LineTraceScreen> {
                             flashColor: _flashColor,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

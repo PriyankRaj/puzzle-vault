@@ -5,9 +5,15 @@ import '../game_definition.dart';
 import '../progress_store.dart';
 import '../settings_store.dart';
 import '../sound.dart';
-import 'game_host.dart';
+import 'game_actions.dart';
 import 'info_tip_button.dart';
 
+/// The level picker for a [GameMode.levels] game. Reached from an in-game
+/// "Levels" action (see `game_actions.dart`), not as a mandatory step before
+/// every game — `HomeScreen` jumps straight into `GameHost` at the next
+/// unlocked level. Tapping an unlocked tile pops this screen with the
+/// chosen level number for `GameHost` to apply; it never pushes a nested
+/// `GameHost` itself.
 class LevelSelectScreen extends StatefulWidget {
   const LevelSelectScreen({super.key, required this.def});
 
@@ -19,41 +25,8 @@ class LevelSelectScreen extends StatefulWidget {
 
 class _LevelSelectScreenState extends State<LevelSelectScreen> {
   Future<void> _confirmReset(BuildContext context) async {
-    final def = widget.def;
-    Sfx.tap();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Reset ${def.title}?'),
-          content: const Text(
-            'This clears unlocked levels and stars for this game only. '
-            'This cannot be undone.',
-          ),
-          actionsAlignment: MainAxisAlignment.spaceBetween,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
-              child: const Text('Reset'),
-            ),
-          ],
-        );
-      },
-    );
-    if (confirmed != true) return;
-
-    await ProgressStore.instance.resetGame(def.id);
-    Sfx.success();
-    if (!context.mounted) return;
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${def.title} progress has been reset')),
-    );
+    await confirmAndResetGame(context, widget.def);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -79,35 +52,38 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
           ),
           body: Padding(
             padding: const EdgeInsets.all(20),
-            child: GridView.builder(
-              itemCount: def.levelCount,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 1,
-              ),
-              itemBuilder: (context, index) {
-                final level = index + 1;
-                final isLocked = level > unlocked;
-                final earned = stars[level] ?? 0;
-                return _LevelTile(
-                  level: level,
-                  locked: isLocked,
-                  stars: earned,
-                  tint: def.tint,
-                  onTap: isLocked
-                      ? null
-                      : () async {
-                          Sfx.tap();
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  GameHost(def: def, initialLevel: level),
-                            ),
-                          );
-                          if (mounted) setState(() {});
-                        },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Keep tiles a sensible size on wide/tablet screens instead
+                // of a fixed 3-up grid stretching them arbitrarily wide.
+                final crossAxisCount = (constraints.maxWidth / 130)
+                    .floor()
+                    .clamp(3, 6);
+                return GridView.builder(
+                  itemCount: def.levelCount,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: textScaleAdjustedAspectRatio(context, 1),
+                  ),
+                  itemBuilder: (context, index) {
+                    final level = index + 1;
+                    final isLocked = level > unlocked;
+                    final earned = stars[level] ?? 0;
+                    return _LevelTile(
+                      level: level,
+                      locked: isLocked,
+                      stars: earned,
+                      tint: def.tint,
+                      onTap: isLocked
+                          ? null
+                          : () {
+                              Sfx.tap();
+                              Navigator.of(context).pop(level);
+                            },
+                    );
+                  },
                 );
               },
             ),
@@ -135,46 +111,59 @@ class _LevelTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final label = locked
+        ? 'Level $level, locked'
+        : 'Level $level, $stars of 3 stars';
     return Material(
       color: locked ? AppTheme.surface : AppTheme.surfaceHigh,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (locked)
-                Icon(
-                  Icons.lock_rounded,
-                  color: AppTheme.textSecondary,
-                  size: 22,
-                )
-              else
-                Text(
-                  '$level',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: tint.primary,
-                  ),
-                ),
-              const SizedBox(height: 6),
-              if (!locked)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (i) {
-                    final filled = i < stars;
-                    return Icon(
-                      filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                      size: 12,
-                      color: filled ? AppTheme.warning : AppTheme.textSecondary,
-                    );
-                  }),
-                ),
-            ],
+        child: Semantics(
+          button: true,
+          label: label,
+          child: ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (locked)
+                    Icon(
+                      Icons.lock_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 22,
+                    )
+                  else
+                    Text(
+                      '$level',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: tint.primary,
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  if (!locked)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (i) {
+                        final filled = i < stars;
+                        return Icon(
+                          filled
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 16,
+                          color: filled
+                              ? AppTheme.warning
+                              : AppTheme.textSecondary,
+                        );
+                      }),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

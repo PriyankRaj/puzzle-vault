@@ -170,6 +170,29 @@ class _InstantPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
+/// A `GridView` `childAspectRatio` that shrinks (taller cells) as the
+/// system text-scale setting grows, so fixed-aspect grid cards/tiles that
+/// hold scalable text don't overflow under accessibility text scaling.
+/// [base] is the ratio at a 1.0 text scale; [minRatio] bounds how tall a
+/// cell is allowed to get at very large scales, so it doesn't grow
+/// unboundedly on a system set to the maximum text size.
+double textScaleAdjustedAspectRatio(
+  BuildContext context,
+  double base, {
+  double minRatio = 0.45,
+}) {
+  // TextScaler has no single "factor" for non-linear system scalers, so
+  // this samples the scaler at a representative font size as a proxy —
+  // close enough to keep cells from overflowing without needing to know
+  // the exact scaling curve.
+  const referenceFontSize = 14.0;
+  final scale =
+      MediaQuery.textScalerOf(context).scale(referenceFontSize) /
+      referenceFontSize;
+  if (scale <= 1) return base;
+  return (base / scale).clamp(minRatio, base);
+}
+
 /// Category tint used for a game's card + accents, purely decorative.
 /// Deliberately brightness-independent — vivid icon-tile gradients read
 /// fine on both the light and dark home screen.

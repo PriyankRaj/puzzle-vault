@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original physics puzzle: a "parcel" (a plain colored orb) hangs from 1-3
 /// rope segments. Ropes act as simple max-distance constraints (a taut rope
@@ -321,7 +322,10 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
   static const int _substeps = 6;
   static const double _settleSpeed = 40;
   static const int _settleTicksNeeded = 20;
-  static const double _cutThreshold = 18;
+  // Slightly larger than the visual rope thickness so a near-miss tap
+  // still registers, especially now that a wider canvas may spread ropes
+  // further apart than the fixed-shrink layout used to.
+  static const double _cutThreshold = 24;
 
   late _LevelSpec _spec;
   late List<double> _ropeLengths;
@@ -597,16 +601,17 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
     return (p - closest).distance;
   }
 
-  Offset _toLogical(Offset local, double scale) {
+  Offset _toLogical(Offset local, double scale, Offset origin) {
+    final adjusted = local - origin;
     return Offset(
-      (local.dx / scale).clamp(0, _canvasW),
-      (local.dy / scale).clamp(0, _canvasH),
+      (adjusted.dx / scale).clamp(0, _canvasW),
+      (adjusted.dy / scale).clamp(0, _canvasH),
     );
   }
 
-  void _handleTap(Offset local, double scale) {
+  void _handleTap(Offset local, double scale, Offset origin) {
     if (_completed || _failed) return;
-    final point = _toLogical(local, scale);
+    final point = _toLogical(local, scale, origin);
     var bestDist = double.infinity;
     var bestIndex = -1;
     for (var i = 0; i < _spec.anchors.length; i++) {
@@ -624,6 +629,52 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
     }
   }
 
+  /// There's no stored rope-cut-timing solution for this game — that
+  /// depends on live swing state, not just level data. This is a simple
+  /// geometric judgement (which uncut rope, if cut right now, points the
+  /// parcel most directly toward the target), not a physics solver.
+  void _showHint() {
+    if (_completed || _failed) return;
+    final remaining = <int>[
+      for (var i = 0; i < _ropeCut.length; i++)
+        if (!_ropeCut[i]) i,
+    ];
+    if (remaining.isEmpty) return;
+    // Approximate "straight toward the target" by picking whichever
+    // remaining rope's anchor is most nearly opposite the target direction
+    // from the parcel (i.e. cutting it lets the parcel swing/fall most
+    // directly toward the target).
+    final toTarget = _spec.targetCenter - _parcelPos;
+    final toTargetDir = toTarget.distance > 0
+        ? toTarget / toTarget.distance
+        : const Offset(0, 1);
+    var bestIndex = remaining.first;
+    var bestScore = double.negativeInfinity;
+    for (final i in remaining) {
+      final toAnchor = _spec.anchors[i] - _parcelPos;
+      final away = toAnchor.distance > 0
+          ? -toAnchor / toAnchor.distance
+          : Offset.zero;
+      final score = away.dx * toTargetDir.dx + away.dy * toTargetDir.dy;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+    final horizontal = toTarget.dx.abs() < 20
+        ? ''
+        : (toTarget.dx > 0 ? ' to the right' : ' to the left');
+    final vertical = toTarget.dy > 20 ? ' and below' : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'The target is$horizontal$vertical — try cutting the rope '
+          'closest to anchor ${bestIndex + 1} to send the parcel that way.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ropesLeft = _ropeCut.where((c) => !c).length;
@@ -639,6 +690,12 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
       appBar: AppBar(
         title: Text('Snip Logic · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: snipLogicDefinition,
+            ctx: widget.ctx,
+            onHint: (_completed || _failed) ? null : _showHint,
+          ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
@@ -671,24 +728,32 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
             ),
           ),
           Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _canvasW / _canvasH,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final scale = constraints.maxWidth / _canvasW;
-                      return GestureDetector(
-                        onTapUp: (d) => _handleTap(d.localPosition, scale),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const padding = 12.0;
+                final innerW = constraints.maxWidth - padding * 2;
+                final innerH = constraints.maxHeight - padding * 2;
+                final scale = min(innerW / _canvasW, innerH / _canvasH);
+                final paintedW = _canvasW * scale;
+                final paintedH = _canvasH * scale;
+                final origin = Offset(
+                  padding + (innerW - paintedW) / 2,
+                  padding + (innerH - paintedH) / 2,
+                );
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (d) => _handleTap(d.localPosition, scale, origin),
+                  child: Padding(
+                    padding: const EdgeInsets.all(padding),
+                    child: Center(
+                      child: SizedBox(
+                        width: paintedW,
+                        height: paintedH,
                         child: AnimatedBuilder(
                           animation: _pulseController,
                           builder: (context, _) {
                             return CustomPaint(
-                              size: Size(
-                                constraints.maxWidth,
-                                constraints.maxHeight,
-                              ),
+                              size: Size(paintedW, paintedH),
                               painter: _SnipLogicPainter(
                                 scale: scale,
                                 spec: _spec,
@@ -700,11 +765,11 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
                             );
                           },
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],

@@ -9,7 +9,6 @@ import 'lights_out/lights_out_game.dart';
 import 'line_trace/line_trace_game.dart';
 import 'loop_trace/loop_trace_game.dart';
 import 'merge2048/merge2048_game.dart';
-import 'merge_threes/merge_threes_game.dart';
 import 'physics_logic/physics_logic_game.dart';
 import 'ragdoll_trials/ragdoll_trials_game.dart';
 import 'rule_breaker/rule_breaker_game.dart';
@@ -37,7 +36,6 @@ final List<GameDefinition> gameRegistry = [
   defuseProtocolDefinition,
   physicsLogicDefinition,
   trickLogicDefinition,
-  mergeThreesDefinition,
   flowConnectDefinition,
   slideEscapeDefinition,
   snipLogicDefinition,

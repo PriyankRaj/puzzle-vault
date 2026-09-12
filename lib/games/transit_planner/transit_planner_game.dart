@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: an original network-design strategy game,
 /// loosely (mechanically) inspired by the generic idea of "connect matching
@@ -329,6 +330,46 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
     }
   }
 
+  void _handlePanEnd() {
+    _dragCursor = null;
+  }
+
+  /// Reveals one step of the always-valid "spine" solution proved in the
+  /// class doc above [_LevelData]: connecting stations 0 -> 1 -> ... ->
+  /// (n-1) on a single line always solves any level here. Finds how far
+  /// the active line currently reaches and suggests the next station in
+  /// that spine.
+  void _showHint() {
+    if (_completed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This level is already solved!')),
+      );
+      return;
+    }
+    final line = _lines[_activeLine];
+    final n = _data.stations.length;
+    final nextIndex = line.isEmpty ? 0 : line.last + 1;
+    if (nextIndex >= n) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Line ${_activeLine + 1} already reaches the end of the loop — '
+            'check whether every station is covered by some line.',
+          ),
+        ),
+      );
+      return;
+    }
+    final verb = line.isEmpty ? 'Start' : 'Extend';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$verb Line ${_activeLine + 1} toward station ${nextIndex + 1}.',
+        ),
+      ),
+    );
+  }
+
   void _clearLine(int i) {
     if (_completed) return;
     setState(() => _lines[i].clear());
@@ -399,6 +440,12 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
       appBar: AppBar(
         title: Text('Level ${widget.ctx.level}'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: transitPlannerDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -421,15 +468,30 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = constraints.maxWidth;
-                      return GestureDetector(
-                        onPanStart: (d) => _onPanStart(d.localPosition, size),
-                        onPanUpdate: (d) => _onPanUpdate(d.localPosition, size),
-                        onPanEnd: (_) => _dragCursor = null,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const boardPadding = 20.0;
+                    final outerSize = constraints.maxWidth;
+                    final size = outerSize - boardPadding * 2;
+                    // GestureDetector wraps the Padding (rather than the
+                    // reverse) and is `opaque`, so its hit-test area is the
+                    // full outer square, including the padding ring — a
+                    // drag starting there no longer misses the board
+                    // entirely. `localPosition` is relative to that outer
+                    // edge, so it's shifted back by `boardPadding` before
+                    // being converted to normalized station coordinates.
+                    Offset toCanvas(Offset local) =>
+                        local - const Offset(boardPadding, boardPadding);
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (d) =>
+                          _onPanStart(toCanvas(d.localPosition), size),
+                      onPanUpdate: (d) =>
+                          _onPanUpdate(toCanvas(d.localPosition), size),
+                      onPanEnd: (_) => _handlePanEnd(),
+                      onPanCancel: _handlePanEnd,
+                      child: Padding(
+                        padding: const EdgeInsets.all(boardPadding),
                         child: CustomPaint(
                           size: Size(size, size),
                           painter: _TransitPainter(
@@ -438,9 +500,9 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
                             flashSuccess: _flashSuccess,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

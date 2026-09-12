@@ -10,9 +10,8 @@ import 'package:topgames/games/merge2048/merge2048_game.dart';
 /// in merge2048_game.dart), so this test cannot know exact tile positions or
 /// values ahead of time and cannot deterministically replay a specific merge
 /// or a specific game-over board. Instead it reads the real rendered board
-/// (via the `AnimatedContainer` tiles built by the `GridView.builder`, in
-/// the same row-major index order as `_board`) through repeated swipes and
-/// asserts on invariants that must hold regardless of the random seed:
+/// through repeated swipes and asserts on invariants that must hold
+/// regardless of the random seed:
 ///   * sliding + merging a line never changes the total tile value sum
 ///     (a merge of v+v -> 2v preserves the pair's sum) — only the newly
 ///     spawned tile can add to the board sum, and only by 2 or 4.
@@ -20,25 +19,34 @@ import 'package:topgames/games/merge2048/merge2048_game.dart';
 ///     the drop in nonzero tile count once the spawn is accounted for), and
 ///     the increase is always a positive multiple of 4 (the smallest
 ///     possible merge is 2+2 -> 4).
-/// This directly exercises `_mergeLine`/`_move`'s real merge math on
-/// whatever pairs the random board happens to produce, across many swipes.
-int? _tileValueOf(AnimatedContainer c) {
-  final child = c.child;
-  if (child == null) return 0;
-  final text = (child as Text).data!;
-  return int.parse(text);
-}
+/// This directly exercises `_move`'s real merge math on whatever pairs the
+/// random board happens to produce, across many swipes.
+///
+/// Tiles render as individually-animated, identity-keyed widgets (not a
+/// fixed 16-slot `GridView`) so they can visibly slide/pop rather than snap
+/// — see merge2048_game.dart's `_Tile`/`AnimatedPositioned`. That means
+/// there's no longer a fixed widget-index -> board-slot mapping to read
+/// row-major; instead this reads every tile's value (found via the
+/// `mergeBoard` key), sorted into a canonical order and padded with zeros to
+/// 16 entries. That's still exactly enough to check the invariants above —
+/// they only depend on the *set* of values on the board, never on position.
+const _cells = 16;
 
 List<int> _readBoard(WidgetTester tester) {
-  final containers = find
-      .descendant(
-        of: find.byType(GridView),
-        matching: find.byType(AnimatedContainer),
-      )
-      .evaluate()
-      .map((el) => el.widget as AnimatedContainer)
-      .toList();
-  return containers.map((c) => _tileValueOf(c)!).toList();
+  final values =
+      find
+          .descendant(
+            of: find.byKey(const Key('mergeBoard')),
+            matching: find.byType(Text),
+          )
+          .evaluate()
+          .map((el) => int.parse((el.widget as Text).data!))
+          .toList()
+        ..sort();
+  while (values.length < _cells) {
+    values.add(0);
+  }
+  return values;
 }
 
 int _readScore(WidgetTester tester) {
@@ -47,8 +55,20 @@ int _readScore(WidgetTester tester) {
 }
 
 Future<void> _swipe(WidgetTester tester, Offset direction) async {
-  await tester.fling(find.byType(GridView), direction, 1200);
-  await tester.pump();
+  // warnIfMissed: false — the tap lands correctly on the ancestor
+  // SwipeArea's opaque GestureDetector (confirmed by every test passing);
+  // the RenderStack at 'mergeBoard' just isn't itself a hit-test target
+  // (no HitTestBehavior set), which is what the default warning flags.
+  await tester.fling(
+    find.byKey(const Key('mergeBoard')),
+    direction,
+    1200,
+    warnIfMissed: false,
+  );
+  // Slide + (if anything merged) the delayed cleanup/spawn phase both need
+  // to finish before the board reflects the completed move — see _move's
+  // two-phase setState in merge2048_game.dart.
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -180,7 +200,7 @@ void main() {
   );
 
   testWidgets(
-    'merge2048: a slow drag below the velocity threshold does not move or merge anything',
+    'merge2048: a short drag below the minimum swipe distance does not move or merge anything',
     (tester) async {
       var completed = false;
 
@@ -202,15 +222,16 @@ void main() {
       final boardBefore = _readBoard(tester);
       final scoreBefore = _readScore(tester);
 
-      // `_move` is only invoked when `details.primaryVelocity.abs() >= 100`
-      // (see the `onHorizontalDragEnd`/`onVerticalDragEnd` handlers in
-      // merge2048_game.dart). A slow, deliberate drag stays well under that
-      // threshold, so nothing on the board should change — this holds
-      // regardless of the random initial board.
+      // `SwipeArea` resolves a swipe on total drag *distance*, not
+      // velocity (see swipe_area.dart) — a short, slow drag stays well
+      // under its `minDistance` threshold, so nothing on the board should
+      // change regardless of how slowly it's drawn or the random initial
+      // board.
       await tester.timedDrag(
-        find.byType(GridView),
+        find.byKey(const Key('mergeBoard')),
         const Offset(40, 0),
         const Duration(seconds: 2),
+        warnIfMissed: false,
       );
       await tester.pump();
 

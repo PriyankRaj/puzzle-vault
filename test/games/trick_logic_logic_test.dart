@@ -115,4 +115,50 @@ void main() {
       expect(completed, isTrue);
     },
   );
+
+  testWidgets('trick_logic: level 10 drag-and-drop still works inside the '
+      'SingleChildScrollView — dragging the smallest square onto the target '
+      'completes the level, and dragging a larger one shows the hint instead', (
+    tester,
+  ) async {
+    var completed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrickLogicScreen(
+          ctx: GameLevelContext(
+            gameId: 'trick_logic',
+            level: 10,
+            isEndless: false,
+            onComplete: ({int stars = 0, int? score}) => completed = true,
+            onExit: () {},
+          ),
+        ),
+      ),
+    );
+
+    // Draggable squares are sized 70, 40, 55 in source order — the second
+    // one (40) is the smallest and is the correct answer.
+    final draggables = find.byType(Draggable<double>);
+    expect(draggables, findsNWidgets(3));
+    final target = find.byType(DragTarget<double>);
+
+    // Dragging the largest square onto the target should not complete
+    // the level, and should surface the "too big" hint.
+    await tester.drag(
+      draggables.at(0),
+      tester.getCenter(target) - tester.getCenter(draggables.at(0)),
+    );
+    await tester.pumpAndSettle();
+    expect(completed, isFalse);
+    expect(find.text('Too big — drag the SMALLEST square.'), findsOneWidget);
+
+    // Dragging the smallest square onto the target completes the level.
+    await tester.drag(
+      draggables.at(1),
+      tester.getCenter(target) - tester.getCenter(draggables.at(1)),
+    );
+    await tester.pumpAndSettle();
+    expect(completed, isTrue);
+  });
 }

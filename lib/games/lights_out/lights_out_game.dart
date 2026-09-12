@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: classic grid-toggle logic puzzle (public
 /// domain mechanic). 15 levels, grid size and scramble depth scale up.
@@ -89,10 +90,101 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
     }
   }
 
+  /// Solves `A * x = b` over GF(2), where `A` is the standard Lights Out
+  /// toggle matrix (pressing column-cell `j` flips row-cell `i` iff `i` is
+  /// `j` itself or one of its up/down/left/right neighbours) and `b` is the
+  /// vector of currently-lit cells. Any `x` with `x[j] == 1` is a cell whose
+  /// press is *guaranteed* to be part of a solution from the current board
+  /// state — unlike replaying the original scramble, this stays correct no
+  /// matter what moves the player has already made. Returns the first such
+  /// cell, or null if the (small, dense) system has no exact solution.
+  Point<int>? _solveHint() {
+    final n = _size * _size;
+    final bBit = 1 << n;
+    final mask = bBit - 1;
+    final aug = List<int>.filled(n, 0);
+
+    for (var j = 0; j < n; j++) {
+      final r = j ~/ _size;
+      final c = j % _size;
+      final affected = <int>[j];
+      if (r > 0) affected.add(j - _size);
+      if (r < _size - 1) affected.add(j + _size);
+      if (c > 0) affected.add(j - 1);
+      if (c < _size - 1) affected.add(j + 1);
+      for (final i in affected) {
+        aug[i] |= 1 << j;
+      }
+    }
+    for (var i = 0; i < n; i++) {
+      final r = i ~/ _size;
+      final c = i % _size;
+      if (_grid[r][c]) aug[i] |= bBit;
+    }
+
+    var row = 0;
+    final pivotRowOfCol = <int, int>{};
+    for (var col = 0; col < n && row < n; col++) {
+      var pivot = -1;
+      for (var i = row; i < n; i++) {
+        if ((aug[i] >> col) & 1 == 1) {
+          pivot = i;
+          break;
+        }
+      }
+      if (pivot == -1) continue;
+      final tmp = aug[row];
+      aug[row] = aug[pivot];
+      aug[pivot] = tmp;
+      for (var i = 0; i < n; i++) {
+        if (i != row && (aug[i] >> col) & 1 == 1) {
+          aug[i] ^= aug[row];
+        }
+      }
+      pivotRowOfCol[col] = row;
+      row++;
+    }
+
+    for (var i = 0; i < n; i++) {
+      if ((aug[i] & mask) == 0 && (aug[i] & bBit) != 0) {
+        return null; // inconsistent system — shouldn't happen from a valid scramble.
+      }
+    }
+
+    for (final entry in pivotRowOfCol.entries) {
+      final solved = (aug[entry.value] & bBit) != 0;
+      if (solved) {
+        final j = entry.key;
+        return Point(j ~/ _size, j % _size);
+      }
+    }
+    return null; // already solved: no cell needs pressing.
+  }
+
+  void _showHint() {
+    final hint = _solveHint();
+    final message = hint == null
+        ? lightsOutDefinition.helpText
+        : 'Try toggling row ${hint.x + 1}, column ${hint.y + 1}.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Tile Toggle · Level $_level')),
+      appBar: AppBar(
+        title: Text('Tile Toggle · Level $_level'),
+        actions: [
+          ...gameActions(
+            context: context,
+            def: lightsOutDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -107,7 +199,7 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
               child: AspectRatio(
                 aspectRatio: 1,
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(8),
                   child: GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _size * _size,

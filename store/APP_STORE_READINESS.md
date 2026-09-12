@@ -7,9 +7,21 @@ signed build and submitting for review.**
 
 ## App identity
 
+⚠️ **Stale as of the "19 games" UX-feedback pass**: the game count dropped
+from 20 to 19 (one genuine duplicate, "Sequence Merge", was removed — see
+`CONTEXT.md`), and the Sudoku-style game was renamed from "Number Grid" to
+"Sudoku". The listing name, subtitle, promotional text, and screenshots
+below were already pushed **live** to App Store Connect via browser
+automation with the user's real Apple Developer account (see the "done"
+section below) — editing this file does not change the live listing. This
+needs the user to log into App Store Connect themselves and update the
+listing name, subtitle/promo text, and re-capture the 2 screenshots that
+show the now-renamed game (`02_gameplay_number_grid.png`), or explicitly
+decide it's not worth doing before the first submission.
+
 | Field | Value |
 |---|---|
-| App Store listing name | **Puzzle Vault: 20 Games** (the plain name "Puzzle Vault" was already taken by another app on the App Store — in-app branding, Android listing, and icon are unaffected) |
+| App Store listing name | **Puzzle Vault: 20 Games** (live in App Store Connect as of 2026-09-12; now stale, see the note above — the plain name "Puzzle Vault" was already taken by another app on the App Store — in-app branding, Android listing, and icon are unaffected) |
 | Bundle ID | `com.katariya.topgames` (matches Android's `applicationId`) — registered as an App ID in the Apple Developer portal on 2026-09-12 |
 | Apple ID (App Store Connect numeric ID) | 6811286658 |
 | Version / build | `1.0.0` / `1` (`pubspec.yaml`'s `1.0.0+1`) |

@@ -26,21 +26,21 @@ before ever uploading.
 
 **Short description** (≤80 characters):
 
-> 20 original offline puzzle & logic games. No ads, no wifi, no account.
+> 19 original offline puzzle & logic games. No ads, no wifi, no account.
 
 **Full description** (≤4000 characters):
 
-> Puzzle Vault is a collection of 20 original puzzle and logic games in one
+> Puzzle Vault is a collection of 19 original puzzle and logic games in one
 > app — no internet connection required, ever.
 >
 > Every game is a fresh, original take on a classic puzzle mechanic: number
 > grids, tile-toggling, sliding blocks, path tracing, loop drawing, rule
 > rewriting, tile merging, and more. Each level-based game has up to 15
 > hand-designed levels with a star rating for how efficiently you solve
-> them; two games are endless high-score chasers.
+> them; one game is an endless high-score chaser.
 >
 > Features:
-> • 20 distinct games, all playable offline
+> • 19 distinct games, all playable offline
 > • Light and dark themes
 > • Independent sound and animation toggles
 > • Per-game or all-at-once progress reset
@@ -85,17 +85,24 @@ resized to a modern 1080×1920/440dpi profile for the capture — see
 `store/screenshots/android/README.md`):
 
 1. `01_home.png` — home screen, dark theme
-2. `02_level_select.png` — Number Grid's level-select screen (info tip +
-   per-game reset icons visible in the AppBar)
-3. `03_gameplay.png` — Number Grid (Sudoku-style) gameplay
+2. `02_level_select.png` — the Sudoku-style game's level-select screen (info
+   tip + per-game reset icons visible in the AppBar) — captured when this
+   game was still named "Number Grid" in-app; it's since been renamed to
+   "Sudoku" and the level-select screen it's no longer the mandatory entry
+   point (home now jumps straight into gameplay). The screenshot's UI text
+   is stale — recapture if you want it to match current in-app copy.
+3. `03_gameplay.png` — same game's (Sudoku-style) gameplay — same staleness
+   note as above.
 4. `04_settings.png` — Settings screen
 5. `05_home_light.png` — home screen, light theme
 
 Play requires 2–8 phone screenshots; these 5 already satisfy that, and
 show off the theme toggle and per-game controls without needing every one
-of the 20 games captured. ⚠️ If you want more/different screens (e.g. an
-endless game, a different puzzle type, tablet screenshots), rerun the same
-capture flow — see `store/screenshots/android/README.md`.
+of the 19 games captured. ⚠️ If you want more/different screens (e.g. an
+endless game, a different puzzle type, tablet screenshots, or just
+refreshed captures reflecting the renamed Sudoku game and the new jump-
+straight-into-gameplay home flow), rerun the same capture flow — see
+`store/screenshots/android/README.md`.
 
 ⚠️ **Not attempted:** a tablet screenshot set. Play Console doesn't require
 tablet screenshots for a phone-only listing; only add these if you decide

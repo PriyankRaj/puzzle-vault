@@ -26,6 +26,16 @@ class ProgressStore {
   String _unlockedKey(String gameId) => 'unlocked_$gameId';
   String _starsKey(String gameId) => 'stars_$gameId';
   String _bestScoreKey(String gameId) => 'best_score_$gameId';
+  String _helpSeenKey(String gameId) => 'help_seen_$gameId';
+
+  /// Whether the player has already been shown this game's "how to play"
+  /// help automatically (see `GameHost`'s first-launch onboarding). Once
+  /// true, the ⓘ button is still there, but it never auto-opens again.
+  bool hasSeenHelp(String gameId) => _p.getBool(_helpSeenKey(gameId)) ?? false;
+
+  Future<void> markHelpSeen(String gameId) async {
+    await _p.setBool(_helpSeenKey(gameId), true);
+  }
 
   int unlockedLevel(String gameId) => _p.getInt(_unlockedKey(gameId)) ?? 1;
 

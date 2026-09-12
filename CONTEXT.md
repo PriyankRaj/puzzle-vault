@@ -16,12 +16,24 @@ one original, non-infringing mechanic per title → implement all 20 behind a
 shared app shell.
 
 Constraints set by the user, in order given:
-1. High polish, all 20 games, not a subset.
+1. High polish, all 20 games, not a subset. **Superseded** during a later
+   UX-feedback pass: "Sequence Merge" turned out to be a genuine mechanical
+   duplicate of "Number Merge" (same grid, gesture, and slide/merge/spawn
+   engine — only the merge rule differed) and was removed with the user's
+   explicit go-ahead, dropping the roster to 19. This was a deliberate,
+   confirmed exception to constraint 1, not drift — every other game was
+   checked against its nearest-looking neighbour and kept because it
+   differed in real input model or win condition, not just theming.
 2. Local-only persistence, no backend, no network calls of any kind.
 3. Max 15 levels/scenarios per game where levels apply (endless-mode games —
-   Number Merge / Sequence Merge — are exempt, they have no "level" concept).
+   Number Merge is exempt, it has no "level" concept).
 4. Light/dark theme toggle.
-5. Generic (non-infringing) names for every game — see below.
+5. Generic (non-infringing) names for every game — see below. **Partially
+   revisited**: "Number Grid" was renamed to "Sudoku" (a generic,
+   centuries-old public-domain puzzle name, not a trademark risk like a
+   specific branded game would be) at the user's explicit request. "Number
+   Merge" was deliberately left as-is rather than renamed to "2048", since
+   that name is more closely associated with one specific game.
 6. Settings for sound and animation control (independently toggleable, not
    just a single "effects" switch).
 7. App name: **Puzzle Vault** (chosen after brainstorming; explicit final
@@ -35,9 +47,11 @@ Numberlink/Flow, sliding-block, sokoban-adjacent) or an original mechanic
 only loosely inspired by a known title's *category* — never reusing a third
 party's name, art, exact level layouts, or copy. Concretely:
 
-- Original names throughout (e.g. the Sudoku-style game is "Number Grid", the
-  2048-style game is "Number Merge", the Lights-Out-style game is "Tile
-  Toggle").
+- Original names throughout, with one exception: the Sudoku-style game is
+  named "Sudoku" itself, since Sudoku is a generic, public-domain puzzle
+  name with no single owner to infringe (unlike, say, "2048", which is
+  closely tied to one specific game — the 2048-style game here stays named
+  "Number Merge"). The Lights-Out-style game is "Tile Toggle", etc.
 - All visuals are drawn with Flutter widgets/`CustomPainter` — no bundled
   image or audio assets, so there's nothing to have been copied from
   reference material in the first place.
@@ -105,6 +119,32 @@ category, give it a generic name, and implement it from scratch.
   once a full Xcode install is available on the build machine** — the
   correct fix is almost certainly just fixing the Xcode CLT install, not
   avoiding the dependency forever.
+- **A second real-audio attempt, `soundpool`, was also tried and reverted**
+  during the UX-feedback pass that added `gameActions`/hints/etc. It avoids
+  the `objective_c` dependency chain entirely and passed `flutter test`
+  cleanly — but its bundled Android Kotlin plugin code calls
+  `PluginRegistry.Registrar`, an API removed from the current Flutter
+  Android embedding, so `flutter build apk --debug` failed with
+  `Unresolved reference 'Registrar'`. The package is also marked
+  discontinued on pub.dev. This is the more important lesson than the
+  specific package: **`flutter test` alone is not sufficient to verify an
+  audio plugin** — it never compiles platform (Android/iOS) plugin code,
+  only the Dart side. Any future attempt must be verified against BOTH
+  `flutter test` and a real `flutter build apk --debug` (and ideally an iOS
+  build too, once Xcode is available) before being considered safe to keep.
+- **A third attempt, `just_audio`** (during the same pass that added home
+  progress badges/onboarding/accessibility) — actively maintained, the most
+  widely used Flutter audio package — was tried specifically because it's
+  *not* abandoned like `soundpool`. It still transitively pulls in
+  `path_provider_foundation` → `objective_c` (via `audio_session`) and hit
+  the exact same `ld: tapi error: malformed file... unknown architecture`
+  as the original `audioplayers` attempt. **This confirms the blocker is
+  environmental, not a matter of picking a better-maintained package**:
+  essentially every cross-platform Flutter audio plugin needs
+  `path_provider_foundation` somewhere, and building it needs a full Xcode
+  install — Command Line Tools alone isn't enough, no matter which
+  package sits on top. Don't spend more effort trying other pub.dev
+  packages on this machine; install full Xcode first.
 - **`flutter analyze` and even a Gradle-cached `flutter build apk --debug`
   both missed a real compile error** (`const Icon(..., color:
   AppTheme.success, ...)` after `AppTheme` colors were converted from

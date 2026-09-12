@@ -272,7 +272,12 @@ void main() {
                 (w) =>
                     w is Icon &&
                     w.icon != correctIcon &&
-                    w.icon != Icons.timer_outlined,
+                    w.icon != Icons.timer_outlined &&
+                    // Exclude the shared hint action's icon: it's the first
+                    // Icon in the tree (AppBar comes before the module
+                    // body), and tapping it would open a hint SnackBar
+                    // instead of exercising the intended wrong-answer tap.
+                    w.icon != Icons.lightbulb_outline_rounded,
               )
               .first;
           await tester.tap(wrongIconFinder);

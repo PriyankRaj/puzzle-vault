@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original implementation of the well-known, generic "draw a single loop
 /// that satisfies every numbered cell" logic-puzzle genre (decades-old,
@@ -42,7 +43,7 @@ class _Edges {
 }
 
 class _PuzzleData {
-  _PuzzleData(this.clues, this.parEdgeCount);
+  _PuzzleData(this.clues, this.parEdgeCount, this.edges);
 
   /// clues[r][c] is -1 when the cell has no number, else 0-4.
   final List<List<int>> clues;
@@ -50,6 +51,11 @@ class _PuzzleData {
   /// Number of on-edges in the ground-truth loop used to derive [clues];
   /// used as the par baseline for star scoring.
   final int parEdgeCount;
+
+  /// The ground-truth loop's edge set, retained (rather than discarded)
+  /// so `_showHint` can compare the player's current edges against a real
+  /// solved answer instead of just re-checking clue counts.
+  final _Edges edges;
 }
 
 /// Builds the boundary edges that separate `region` (true = inside the
@@ -248,7 +254,7 @@ _PuzzleData _generatePuzzle(int n, int level) {
     }
   }
 
-  return _PuzzleData(clues, parEdgeCount);
+  return _PuzzleData(clues, parEdgeCount, edges);
 }
 
 class LoopTraceScreen extends StatefulWidget {
@@ -261,9 +267,14 @@ class LoopTraceScreen extends StatefulWidget {
 }
 
 class _LoopTraceScreenState extends State<LoopTraceScreen> {
+  /// Tolerance (logical pixels) added to the nearest-edge tap search so
+  /// near-misses on an edge midpoint still register.
+  static const double _hitSlop = 10.0;
+
   late int _n;
   late List<List<int>> _clues;
   late int _parEdgeCount;
+  late _Edges _solutionEdges;
   late List<List<bool>> _hOn;
   late List<List<bool>> _vOn;
   int _toggles = 0;
@@ -278,6 +289,7 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
     final puzzle = _generatePuzzle(_n, _level);
     _clues = puzzle.clues;
     _parEdgeCount = puzzle.parEdgeCount;
+    _solutionEdges = puzzle.edges;
     _hOn = List.generate(_n + 1, (_) => List.filled(_n, false));
     _vOn = List.generate(_n, (_) => List.filled(_n + 1, false));
   }
@@ -320,7 +332,7 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
         }
       }
     }
-    if (bestType == null || bestDist > cellSize * 0.42) return;
+    if (bestType == null || bestDist > cellSize * 0.42 + _hitSlop) return;
     setState(() {
       if (bestType == 'h') {
         _hOn[bestI][bestJ] = !_hOn[bestI][bestJ];
@@ -347,12 +359,59 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
     Future.microtask(() => widget.ctx.onComplete(stars: stars));
   }
 
+  /// Finds one edge where the player's current on/off state disagrees with
+  /// the retained ground-truth solved loop, and announces it. This is a
+  /// real solution-derived reveal (not a geometric guess) because the
+  /// solved edge set from generation is kept around instead of discarded.
+  void _showHint() {
+    if (_solved) return;
+    for (var i = 0; i <= _n; i++) {
+      for (var j = 0; j < _n; j++) {
+        if (_hOn[i][j] != _solutionEdges.h[i][j]) {
+          final should = _solutionEdges.h[i][j] ? 'on' : 'off';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'The horizontal edge at row $i, column $j should be $should.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+    for (var i = 0; i < _n; i++) {
+      for (var j = 0; j <= _n; j++) {
+        if (_vOn[i][j] != _solutionEdges.v[i][j]) {
+          final should = _solutionEdges.v[i][j] ? 'on' : 'off';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'The vertical edge at row $i, column $j should be $should.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Your edges already match the solution!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: loopTraceDefinition,
+            ctx: widget.ctx,
+            onHint: _solved ? null : _showHint,
+          ),
           TextButton(onPressed: _clear, child: const Text('Clear')),
           TextButton(
             onPressed: widget.ctx.onExit,

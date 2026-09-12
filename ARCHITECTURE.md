@@ -1,6 +1,6 @@
 # Architecture
 
-Puzzle Vault is one Flutter app hosting 20 independent mini-games behind a
+Puzzle Vault is one Flutter app hosting 19 independent mini-games behind a
 shared framework. The framework exists so that theming, settings, sound,
 level progression, and win/fail UX are implemented exactly once, and every
 game just plugs into it.
@@ -15,13 +15,15 @@ lib/
     game_level_context.dart   GameLevelContext (passed into each game screen)
     progress_store.dart       ProgressStore (per-game/per-level persistence)
     settings_store.dart       AppSettingsStore (dark mode / sound / animations)
-    sound.dart                Sfx (system click + haptic feedback patterns)
+    sound.dart                Sfx (generated SFX via soundpool + haptic patterns)
     motion.dart                Motion (zero-durations when animations are off)
     widgets/
       game_host.dart          GameHost (wraps every game screen)
-      level_select_screen.dart
-      result_dialog.dart      showLevelCompleteDialog / showLevelFailedDialog
+      level_select_screen.dart  in-game level picker (see below)
+      result_dialog.dart      LevelCompleteOverlay / showLevelFailedDialog
+      game_actions.dart       gameActions() — shared AppBar actions
       info_tip_button.dart    InfoTipButton ("How to play" ⓘ dialog)
+      swipe_area.dart         SwipeArea — full-area, distance-based swipe detector
   games/<game_id>/<game_id>_game.dart   one file per game
   home/home_screen.dart
   settings/settings_screen.dart
@@ -46,14 +48,27 @@ GameDefinition(
 )
 ```
 
-`lib/games/registry.dart` lists all 20 definitions in display order — this is
+`lib/games/registry.dart` lists all 19 definitions in display order — this is
 the single source of truth for what appears on the home screen.
 
 A game screen receives a `GameLevelContext` (gameId, level, isEndless,
-`onComplete(stars)`, `onExit()`) and is otherwise a normal `StatefulWidget`
-that owns its own board state. Games don't touch `SharedPreferences`,
-navigation, or dialogs directly — they call `ctx.onComplete(...)` /
-`ctx.onExit()` and let `GameHost` handle the rest.
+`onComplete(stars)`, `onExit()`, `onOpenLevelSelect`) and is otherwise a
+normal `StatefulWidget` that owns its own board state. Games don't touch
+`SharedPreferences`, navigation, or dialogs directly — they call
+`ctx.onComplete(...)` / `ctx.onExit()` / `ctx.onOpenLevelSelect?.call()` and
+let `GameHost` handle the rest.
+
+## Home → GameHost, and the in-game level picker
+
+`HomeScreen` pushes `GameHost` directly on tap, at
+`ProgressStore.instance.unlockedLevel(def.id)` for `GameMode.levels` games
+(or level 1 for endless) — it no longer stops at `LevelSelectScreen` first.
+`LevelSelectScreen` still exists, but only as a picker `GameHost` itself
+opens via the "Levels" action (see `gameActions()` below): it's pushed as a
+route on top of the already-open `GameHost`, and simply
+`Navigator.pop(level)`s with the chosen level number instead of pushing a
+nested `GameHost` — `GameHost._openLevelSelect()` awaits that pop and
+applies the level to itself.
 
 ## GameHost — the single choke point
 
@@ -61,16 +76,28 @@ navigation, or dialogs directly — they call `ctx.onComplete(...)` /
 
 - owns the current level/attempt counter and remounts the game via a changing
   `ValueKey('${def.id}_${level}_$attempt')` on retry,
-- shows `showLevelCompleteDialog` / `showLevelFailedDialog` from
-  `result_dialog.dart` when the game calls back,
+- shows a `LevelCompleteOverlay` (`result_dialog.dart`) — a non-modal
+  `Stack` overlay, not a dialog route — over the still-visible solved board
+  when the game calls `onComplete`, or `showLevelFailedDialog` (still a
+  modal `AlertDialog`, since a failed attempt has no solved board worth
+  keeping visible) on failure,
 - persists level completion/star count through `ProgressStore`,
 - is wrapped in `ValueListenableBuilder<bool>` on
   `AppSettingsStore.instance.isDarkMode` so a theme toggle reaches every game
   immediately, not just on next navigation.
 
-Because `GameHost` is the only place all 20 games funnel through, this is
+Because `GameHost` is the only place all 19 games funnel through, this is
 also the only place that had to be touched to make dark/light mode reach
 every game — no per-game plumbing needed.
+
+**Gotcha the overlay change specifically had to avoid:** since
+`LevelCompleteOverlay` is a `Stack` child, not a dialog route, its
+Next/Retry callbacks must only `setState` to hide it — they must never call
+`Navigator.pop()` for that (there's no dialog route to pop). Only `onMenu`
+actually leaves the screen, with a single `Navigator.pop()`. An earlier
+dialog-based version popped once for the dialog and once for the route on
+every button; porting that double-pop to the overlay unchanged would have
+over-popped past the intended screen.
 
 ## Theming
 
@@ -120,23 +147,37 @@ all three, plus a "Reset all progress" action that shows a confirmation
   `AppSettingsStore.instance.soundEnabled`. See "Sound is intentionally thin"
   in `CONTEXT.md` for why this isn't real synthesized audio.
 
-## How-to-play info tips
+## Shared game actions (How-to-play, Hint, Levels, Reset)
 
-Every `GameDefinition` has a required `helpText` string. It's surfaced via
-`InfoTipButton` (`lib/core/widgets/info_tip_button.dart`), an ⓘ icon-button
-that shows an `AlertDialog` with the game's title and `helpText`. Rather than
-adding this button to all 20 individual game screens, it's wired in exactly
-two places:
+`gameActions()` (`lib/core/widgets/game_actions.dart`) returns the list of
+`IconButton`s every game spreads into its own `AppBar.actions`: an optional
+Hint button (only if the game passes `onHint`), the "How to play"
+`InfoTipButton` (`lib/core/widgets/info_tip_button.dart`, an ⓘ icon-button
+showing an `AlertDialog` with `def.helpText`), a "Levels" button (only when
+`ctx.onOpenLevelSelect != null`, i.e. `GameMode.levels` games), and "Reset
+progress" (`confirmAndResetGame`, also in this file).
 
-- `LevelSelectScreen`'s AppBar — covers all 18 `GameMode.levels` games in one
-  place, since they all route through that screen before `GameHost`.
-- The two `GameMode.endless` games' own AppBars (`merge2048_game.dart`,
-  `merge_threes_game.dart`), since they skip level-select entirely and go
-  straight to `GameHost`.
+This used to live only on `LevelSelectScreen`'s AppBar, back when every
+level-based game was forced through that screen before `GameHost`. Now that
+`HomeScreen` jumps straight into `GameHost` (see below), each game owns its
+own copy of these actions instead. Deliberately **not** implemented by
+having `GameHost` impose a shared `Scaffold` above every game — that would
+change the widget tree above all 19 games at once and risk breaking
+index-based test finders (e.g. `test/games/tactics_grid_logic_test.dart`'s
+`_cellGestureDetectorOffset`). Each game still builds its own `Scaffold`;
+`gameActions()` is just spread into its existing `AppBar.actions`.
 
-If you add a 21st game, only add `helpText` to its `GameDefinition` — the
-button placement is automatic for `GameMode.levels` games, and only needs a
-manual `InfoTipButton` if you add another `GameMode.endless` game.
+Hint logic itself lives in each game's own `State`, since it needs live
+board state — `gameActions()` only supplies the button. Most games compute a
+genuine "correct next move" from data they already hold (a stored solution,
+a solved-rotation delta, a GF(2) solve over the toggle matrix, etc.); a few
+physics/strategy games (`physics_logic`, `snip_logic`, `ragdoll_trials`,
+`tactics_grid`) give a directional/heuristic nudge instead, since a real
+solver for those was out of scope for this pass.
+
+If you add a 20th game, add `helpText` to its `GameDefinition` and call
+`gameActions(...)` in its `AppBar.actions`, passing `onHint` if you can
+give it a real hint.
 
 ## Persistence
 
@@ -144,10 +185,10 @@ manual `InfoTipButton` if you add another `GameMode.endless` game.
 singleton keyed by game id + level, storing completion and star count.
 `resetGame(gameId)` clears one game; `resetAll(gameIds)` iterates and calls
 it for every registered game. Settings > "Reset all progress" uses
-`resetAll`; each game's own "Reset progress" action (ⓘ button's neighbour —
-on `LevelSelectScreen`'s AppBar for the 18 level-based games, or directly in
-the two endless games' own AppBars) uses `resetGame` scoped to just that
-game's id.
+`resetAll`; every game's own "Reset progress" action (via `gameActions()`,
+see above) uses `confirmAndResetGame` → `resetGame` scoped to just that
+game's id. `LevelSelectScreen` also keeps its own reset action for players
+who reach it directly.
 
 ## CI
 
@@ -182,13 +223,13 @@ pass before anything merges.
   a seeded `Random()` level generator, the test replicates that generation
   algorithm locally (same seed formula, same call order) to know exactly
   what to tap/drag; see `test/games/lights_out_logic_test.dart` for the
-  reference example. Two endless games (`merge2048`, `merge_threes`) use an
-  unseeded RNG for tile spawns, so their tests assert invariants (score
-  accounting, an oracle-predicted merge outcome) across many real swipes
-  instead of a scripted win.
+  reference example. The one endless game (`merge2048`) uses an unseeded
+  RNG for tile spawns, so its test asserts invariants (score accounting, an
+  oracle-predicted merge outcome) across many real swipes instead of a
+  scripted win.
 - `test/game_smoke_test.dart` also asserts every `gameRegistry` entry has a
   non-empty `helpText` and a corresponding `test/games/<id>_logic_test.dart`
-  file — a 21st game can't silently ship without both.
+  file — a 20th game can't silently ship without both.
 
 **Authoritative check:** run `flutter test`, not just `flutter analyze` or a
 possibly Gradle-cached `flutter build apk`. Both of the latter have been
@@ -205,6 +246,11 @@ incident.
    of a bare `Duration(...)`, so the animations toggle covers it.
 4. Call `Sfx.tap()` / rely on `GameHost`'s `Sfx.success()`/`Sfx.error()` for
    feedback rather than adding a new sound path.
-5. Register it in `lib/games/registry.dart`.
-6. Add it to `test/game_smoke_test.dart` coverage (it's automatic — the smoke
+5. Spread `gameActions(context: context, def: <id>Definition, ctx: ctx,
+   onHint: ...)` into your `AppBar.actions`. Pass `onHint` if you can give a
+   real "reveal a correct move" hint from data your game already holds
+   (see the Hint paragraph above for the pattern); otherwise a directional
+   nudge is an acceptable fallback — just don't oversell it as more than that.
+6. Register it in `lib/games/registry.dart`.
+7. Add it to `test/game_smoke_test.dart` coverage (it's automatic — the smoke
    test iterates `gameRegistry`) and re-run `flutter test`.

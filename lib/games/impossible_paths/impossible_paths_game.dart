@@ -6,6 +6,8 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Reference-original puzzle: a grid of rotatable path segments. Tap a tile
 /// to spin it 90°; connect a fixed START tile to a fixed GOAL tile through a
@@ -433,6 +435,43 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
     Future.microtask(() => widget.ctx.onComplete(stars: stars));
   }
 
+  /// Nudges one mis-rotated path tile a single step closer to its solved
+  /// orientation (mirroring exactly what a real tap on that tile does) and
+  /// announces which tile it touched. This is always a genuine correct move
+  /// — every tappable tile's `solvedRotation` is the only orientation that
+  /// keeps it on the guaranteed start-to-goal chain.
+  void _showHint() {
+    for (var r = 0; r < _spec.rows; r++) {
+      for (var c = 0; c < _spec.cols; c++) {
+        final cell = _grid[r][c];
+        if (!cell.tappable) continue;
+        if (cell.rotation != cell.solvedRotation) {
+          setState(() {
+            cell.rotation = (cell.rotation + 1) % 4;
+            _recomputeConnectivity();
+          });
+          Sfx.tap();
+          if (_connected.contains(_goalPos)) {
+            _finish();
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Rotated the tile at row ${r + 1}, column ${c + 1} closer to solved.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Every tile is already at its solved rotation.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final solved = _connected.contains(_goalPos);
@@ -440,6 +479,12 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: impossiblePathsDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
@@ -469,7 +514,7 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
               child: AspectRatio(
                 aspectRatio: _spec.cols / _spec.rows,
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(8),
                   child: GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _spec.rows * _spec.cols,

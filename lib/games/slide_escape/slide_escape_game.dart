@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original puzzle: a grid holds several rectangular blocks. Every block is
 /// restricted to a single axis — horizontal blocks only slide left/right,
@@ -685,12 +686,50 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
     setState(_resetPositions);
   }
 
+  /// [_LevelSpec.verifiedSolution] is only guaranteed valid when replayed
+  /// from the level's exact starting layout — if the player has already
+  /// made any moves, blindly applying the next scripted move could be
+  /// illegal or simply wrong. So this only reveals a move when the board
+  /// still matches the untouched start state; otherwise it's honest about
+  /// the limitation instead of doing something incorrect.
+  void _showHint() {
+    if (_won) return;
+    final atStart = _spec.blocks.every((b) => _pos[b.id] == (b.row, b.col));
+    if (!atStart || _spec.verifiedSolution.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hint only works from the start of the level — try Restart '
+            'first, then ask for a hint again.',
+          ),
+        ),
+      );
+      return;
+    }
+    final move = _spec.verifiedSolution.first;
+    final block = _blockOf(move.blockId);
+    final direction = block.axis == _Axis.horizontal
+        ? (move.delta > 0 ? 'right' : 'left')
+        : (move.delta > 0 ? 'down' : 'up');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Slide block ${move.blockId} $direction to get started.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Slide Escape · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: slideEscapeDefinition,
+            ctx: widget.ctx,
+            onHint: _won ? null : _showHint,
+          ),
           TextButton(onPressed: _restart, child: const Text('Restart')),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
@@ -728,7 +767,7 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
                   var cellSize = cellFromWidth < cellFromHeight
                       ? cellFromWidth
                       : cellFromHeight;
-                  cellSize = cellSize.clamp(24.0, 64.0);
+                  cellSize = cellSize.clamp(24.0, 120.0);
                   final boardWidth = cellSize * _spec.cols;
                   final boardHeight = cellSize * _spec.rows;
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original turn-based squad-tactics battle. The player commands 2-3 units
 /// with distinct move/range/attack stats against 1-3 enemy units on a grid
@@ -722,6 +723,78 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     });
   }
 
+  String _unitLabel(_UnitType t) {
+    final name = t.name;
+    return name[0].toUpperCase() + name.substring(1);
+  }
+
+  /// A real solver (deterministic enemy AI + turn-based combat search) is
+  /// out of scope for this pass — that's a much larger, separate task. This
+  /// instead reacts cheaply to the CURRENT board state: if an idle unit can
+  /// already attack without moving, say so; otherwise point at the closest
+  /// unengaged threat; otherwise fall back to a short generic tactical tip.
+  /// It is a heuristic nudge, not a solved-state reveal.
+  void _showHint() {
+    if (_phase != _Phase.player) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wait for the enemy turn to finish.')),
+      );
+      return;
+    }
+
+    final idleFriendlies = _friendlies.where((f) => f.alive && !f.acted);
+
+    for (final f in idleFriendlies) {
+      final targets = _attackableFrom(f.pos, f.range, _enemies);
+      if (targets.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Your ${_unitLabel(f.type)} already has an enemy in range — '
+              'attack now instead of moving.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    _Unit? bestFriend;
+    _Unit? bestEnemy;
+    var bestDist = 1 << 30;
+    for (final f in idleFriendlies) {
+      for (final e in _enemies.where((e) => e.alive)) {
+        final d = _dist(f.pos, e.pos);
+        if (d < bestDist) {
+          bestDist = d;
+          bestFriend = f;
+          bestEnemy = e;
+        }
+      }
+    }
+
+    if (bestFriend != null && bestEnemy != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Move your ${_unitLabel(bestFriend.type)} toward the '
+            '${_unitLabel(bestEnemy.type)} to close the distance.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Focus down the weakest or most dangerous enemy first, and keep '
+          'ranged units at max range while your tankier units screen them.',
+        ),
+      ),
+    );
+  }
+
   void _onRetry() => setState(_reset);
 
   _Unit? _friendlyAt(Point<int> p) =>
@@ -753,11 +826,12 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     }
   }
 
-  Widget _hpBar(_Unit u, Color color) {
+  Widget _hpBar(_Unit u, Color color, double cellSize) {
     final frac = (u.hp / u.maxHp).clamp(0.0, 1.0);
+    final barWidth = (cellSize * 0.65).clamp(18.0, 40.0);
     return Container(
-      height: 4,
-      width: 22,
+      height: (cellSize * 0.09).clamp(3.0, 6.0),
+      width: barWidth,
       margin: const EdgeInsets.only(bottom: 3),
       decoration: BoxDecoration(
         color: AppTheme.surfaceHigh,
@@ -776,16 +850,18 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     );
   }
 
-  Widget _unitToken(_Unit u, bool isFriendly) {
+  Widget _unitToken(_Unit u, bool isFriendly, double cellSize) {
     final color = isFriendly ? AppTheme.accent : AppTheme.danger;
     final selected = _selected == u;
+    final tokenSize = (cellSize * 0.7).clamp(24.0, 44.0);
+    final iconSize = (cellSize * 0.4).clamp(14.0, 24.0);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _hpBar(u, isFriendly ? AppTheme.success : AppTheme.danger),
+        _hpBar(u, isFriendly ? AppTheme.success : AppTheme.danger, cellSize),
         Container(
-          width: 28,
-          height: 28,
+          width: tokenSize,
+          height: tokenSize,
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.85),
             shape: BoxShape.circle,
@@ -794,13 +870,17 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                 : null,
           ),
           alignment: Alignment.center,
-          child: Icon(_iconOf(u.type), size: 16, color: AppTheme.background),
+          child: Icon(
+            _iconOf(u.type),
+            size: iconSize,
+            color: AppTheme.background,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCell(int r, int c) {
+  Widget _buildCell(int r, int c, double cellSize) {
     final p = Point(r, c);
     final isObstacle = _obstacles.contains(p);
     final friend = _friendlyAt(p);
@@ -819,9 +899,9 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
 
     Widget? content;
     if (friend != null) {
-      content = _unitToken(friend, true);
+      content = _unitToken(friend, true, cellSize);
     } else if (enemy != null) {
-      content = _unitToken(enemy, false);
+      content = _unitToken(enemy, false, cellSize);
     }
 
     return GestureDetector(
@@ -854,6 +934,12 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
       appBar: AppBar(
         title: Text('Tactics Grid · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: tacticsGridDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -904,17 +990,23 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                   child: AspectRatio(
                     aspectRatio: _def.width / _def.height,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: GridView.builder(
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _def.width * _def.height,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: _def.width,
-                        ),
-                        itemBuilder: (context, index) {
-                          final r = index ~/ _def.width;
-                          final c = index % _def.width;
-                          return _buildCell(r, c);
+                      padding: const EdgeInsets.all(8),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cellSize = constraints.maxWidth / _def.width;
+                          return GridView.builder(
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _def.width * _def.height,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: _def.width,
+                                ),
+                            itemBuilder: (context, index) {
+                              final r = index ~/ _def.width;
+                              final c = index % _def.width;
+                              return _buildCell(r, c, cellSize);
+                            },
+                          );
                         },
                       ),
                     ),

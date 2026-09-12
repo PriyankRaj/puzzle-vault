@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original lateral-thinking puzzle set. Each level shows one short,
 /// literally-worded instruction plus a small interactive widget that looks
@@ -52,6 +53,59 @@ void _hint(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
+/// Proactive, forward-looking nudges shown when the player taps the Hint
+/// action — one per level. Unlike [_hint] (fired reactively, after a wrong
+/// answer, to explain what went wrong), these are worded to point at each
+/// level's trick *before* the player commits to an answer, without stating
+/// the solution outright.
+const Map<int, String> _forwardHints = {
+  1:
+      'Colors are lying to you here — read what the button actually says, '
+      "not what shade it's painted.",
+  2:
+      "Don't just look at the checkbox — check whether the condition in the "
+      'instruction is even true first.',
+  3:
+      'The number on screen isn\'t the slider\'s raw position — it\'s been '
+      'flipped. Think about what raw value produces the target.',
+  4:
+      'The box wants a number, but the sentence is asking about the word '
+      'itself, not the quantity it usually describes.',
+  5:
+      'One button is explicitly off-limits — the instruction tells you '
+      'which one to leave alone.',
+  6:
+      'A tap is the obvious move, but "obvious" is usually the trap in this '
+      'game — try holding your finger down instead.',
+  7:
+      'Order matters more than which icon looks more "correct" to press '
+      'first — re-read which one comes first.',
+  8:
+      'The big, prominent button is drawing all your attention on purpose — '
+      'scan the corners of the card for something smaller.',
+  9:
+      "Don't just pick numbers that feel special — check each one actually "
+      'meets the mathematical definition given.',
+  10:
+      "Don't eyeball it — compare all three squares directly before you "
+      'decide which one truly is the smallest.',
+  11:
+      'Not every tap you make is being counted — watch the score, not your '
+      'own tap count, to know when you\'re done.',
+  12:
+      "You already know the arithmetic — the trap is in the format the "
+      'answer needs to be typed in.',
+  13:
+      'The switches already match their own labels — that itself is a clue '
+      'about what state they need to end up in.',
+  14:
+      "Don't estimate — the sentence has an exact, countable answer if you "
+      'go letter by letter.',
+  15:
+      'Order matters, and one color is explicitly not part of that order — '
+      'notice which shape needs to be skipped entirely.',
+};
+
 class TrickLogicScreen extends StatefulWidget {
   const TrickLogicScreen({super.key, required this.ctx});
 
@@ -70,6 +124,13 @@ class _TrickLogicScreenState extends State<TrickLogicScreen> {
     if (_solved) return;
     _solved = true;
     widget.ctx.onComplete(stars: 3);
+  }
+
+  void _showHint() {
+    final hint = _forwardHints[_level] ?? 'Read the instruction word-for-word.';
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(hint)));
   }
 
   Widget _buildLevel(BuildContext context) {
@@ -114,6 +175,12 @@ class _TrickLogicScreenState extends State<TrickLogicScreen> {
       appBar: AppBar(
         title: Text('Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: trickLogicDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -121,7 +188,7 @@ class _TrickLogicScreenState extends State<TrickLogicScreen> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: _buildLevel(context),
         ),
@@ -442,6 +509,7 @@ class _Level7State extends State<_Level7> {
             IconButton(
               iconSize: 56,
               onPressed: _tapMoon,
+              tooltip: 'Moon',
               icon: Icon(
                 Icons.nightlight_round,
                 color: _step >= 1 ? AppTheme.accent : AppTheme.textSecondary,
@@ -451,6 +519,7 @@ class _Level7State extends State<_Level7> {
             IconButton(
               iconSize: 56,
               onPressed: _tapStar,
+              tooltip: 'Star',
               icon: Icon(
                 Icons.star_rounded,
                 color: _step >= 1 ? AppTheme.success : AppTheme.warning,
@@ -498,6 +567,7 @@ Widget _level8(BuildContext context, VoidCallback onSolved) {
             right: 4,
             child: IconButton(
               onPressed: onSolved,
+              tooltip: 'Close',
               icon: Icon(Icons.close, color: AppTheme.textSecondary),
             ),
           ),
@@ -899,6 +969,20 @@ class _ShapeSpec {
   final int sides;
   final Color color;
   final IconData icon;
+
+  /// Accessible label for this shape's button — includes color, since the
+  /// level's own instructions ("skip any shape that is coloured red")
+  /// require knowing color to solve it, not just shape name.
+  String get accessibleLabel {
+    const names = {3: 'Triangle', 4: 'Square', 5: 'Pentagon', 6: 'Hexagon'};
+    final shapeName = names[sides] ?? 'Shape';
+    final colorName = color == AppTheme.danger
+        ? 'red'
+        : color == AppTheme.success
+        ? 'green'
+        : 'blue';
+    return '$colorName $shapeName';
+  }
 }
 
 class _Level15 extends StatefulWidget {
@@ -959,6 +1043,7 @@ class _Level15State extends State<_Level15> {
               IconButton(
                 iconSize: 48,
                 onPressed: () => _tap(context, shape),
+                tooltip: shape.accessibleLabel,
                 icon: Icon(shape.icon, color: shape.color),
               ),
           ],

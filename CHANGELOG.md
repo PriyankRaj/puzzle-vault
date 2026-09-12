@@ -40,19 +40,52 @@ to a store yet.
   description) saved as a draft; graphics and screenshots still need a
   manual upload — see `store/PLAY_STORE_READINESS.md`.
 
+### Changed — UX pass driven by real play
+
+- **Home screen jumps straight into gameplay** at the next unlocked level
+  instead of always stopping at `LevelSelectScreen` first; the level picker
+  is still reachable in-game via a "Levels" action. See `game_host.dart`,
+  `home_screen.dart`.
+- **Win moment is now a non-modal celebration** (`LevelCompleteOverlay`,
+  confetti + a compact bottom action bar) rendered over the still-visible
+  solved board, replacing a centered `AlertDialog` that covered it.
+- **Every game has a real Hint action** (`gameActions`) — most compute an
+  actual "correct next move" from live/stored solution state (e.g. Sudoku's
+  solution grid, Path Rotate's solved-rotation deltas, Lights Out's GF(2)
+  solve); a few physics/strategy games get a directional nudge instead,
+  since a genuine solver was out of scope for this pass.
+- **Swipe/drag detectors now cover their full playable area** with
+  `HitTestBehavior.opaque` (new `SwipeArea` widget) instead of just the
+  painted board rect, and resolve on drag *distance* rather than velocity,
+  so slow deliberate swipes register. Fixes Number Merge, Rule Puzzle, Pipe
+  Connect, Region Trace, Route Planner, Draw Physics, Rope Cut.
+- **Removed several hard tile/board size ceilings** (e.g. Slide Escape's
+  64px cap, Step Blocks' fully-fixed board, Rule Manual's 28px wire
+  targets) so boards use available screen space instead of a fixed size.
+- Added swipe-to-move (alongside existing buttons) to Key Escape and Tumble
+  Course, which previously had no board gesture at all.
+- Real audio was attempted twice (`audioplayers`, then `soundpool`) and
+  reverted both times — see `lib/core/sound.dart`'s doc comment and
+  `CONTEXT.md` for why. Sound stays haptics + `SystemSound` only for now.
+- **Removed "Sequence Merge"** — it shared "Number Merge"'s entire grid,
+  gesture, and slide/merge/spawn engine, differing only in the merge rule
+  (see `CONTEXT.md`). Renamed "Number Grid" to **"Sudoku"** (a generic,
+  public-domain puzzle name); left "Number Merge" descriptively named.
+
 ### Added
 
-- 20 original, offline-only puzzle/logic mini-games behind a shared
+- 19 original, offline-only puzzle/logic mini-games behind a shared
   framework (`GameDefinition`, `GameHost`, `LevelSelectScreen`) — see
   `README.md` for the full list.
-- Light/dark theme toggle, reaching every screen including all 20 games.
+- Light/dark theme toggle, reaching every screen including all 19 games.
 - Settings screen: dark mode, sound effects, and animations toggles, each
   independently persisted.
-- "How to play" info tip (ⓘ) on every game — on `LevelSelectScreen` for the
-  18 level-based games, and in-AppBar for the 2 endless games.
-- "Reset progress" for a single game (level-select AppBar / endless games'
-  own AppBar), in addition to the existing "Reset all progress" in Settings.
-- Real logic-driving tests for every one of the 20 games
+- "How to play" info tip (ⓘ) on every game's own `AppBar` via `gameActions`
+  (previously only on `LevelSelectScreen`, which is no longer the mandatory
+  entry point).
+- "Reset progress" for a single game, in addition to the existing "Reset
+  all progress" in Settings.
+- Real logic-driving tests for every one of the 19 games
   (`test/games/*_logic_test.dart`) — most replay a genuine win through the
   actual UI rather than just asserting "boots without crashing".
 - `test/game_smoke_test.dart` now also asserts every registered game has

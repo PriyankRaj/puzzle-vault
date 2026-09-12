@@ -113,7 +113,9 @@ void main() {
     'resetting Number Merge from its own AppBar clears only its best score',
     (tester) async {
       const target = 'merge_2048';
-      const other = 'merge_threes';
+      // Any other registered game id works here — this just proves
+      // resetting merge_2048 doesn't leak into unrelated games' scores.
+      const other = 'sudoku';
       await ProgressStore.instance.setBestScore(target, 4096);
       await ProgressStore.instance.setBestScore(other, 512);
 

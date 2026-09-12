@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original physics sandbox: a ball falls under gravity toward a goal zone.
 /// The player draws freehand strokes (within a limited total-length "ink
@@ -502,25 +503,26 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
 
   // --- Drawing input --------------------------------------------------
 
-  Offset _toLogical(Offset local, double scale) {
+  Offset _toLogical(Offset local, double scale, Offset origin) {
+    final adjusted = local - origin;
     return Offset(
-      (local.dx / scale).clamp(0, _canvasW),
-      (local.dy / scale).clamp(0, _canvasH),
+      (adjusted.dx / scale).clamp(0, _canvasW),
+      (adjusted.dy / scale).clamp(0, _canvasH),
     );
   }
 
-  void _handlePanStart(Offset local, double scale) {
+  void _handlePanStart(Offset local, double scale, Offset origin) {
     if (_running || _completed) return;
     setState(() {
-      _currentStroke = [_toLogical(local, scale)];
+      _currentStroke = [_toLogical(local, scale, origin)];
     });
   }
 
-  void _handlePanUpdate(Offset local, double scale) {
+  void _handlePanUpdate(Offset local, double scale, Offset origin) {
     if (_running || _completed) return;
     final stroke = _currentStroke;
     if (stroke == null) return;
-    final p = _toLogical(local, scale);
+    final p = _toLogical(local, scale, origin);
     final last = stroke.last;
     final dist = (p - last).distance;
     if (dist < 1) return;
@@ -549,6 +551,36 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
     });
   }
 
+  /// There's no stored solution path for this game — a drawn ramp shape
+  /// has no single canonical answer. This is a simple directional nudge
+  /// based on the goal's position relative to the ball, not a physics
+  /// solver.
+  void _showHint() {
+    final delta = _spec.goalCenter - _ballPos;
+    final vertical = delta.dy > 20 ? 'down' : (delta.dy < -20 ? 'up' : null);
+    final horizontal = delta.dx > 20
+        ? 'right'
+        : (delta.dx < -20 ? 'left' : null);
+    String direction;
+    if (vertical != null && horizontal != null) {
+      direction = '$vertical and to the $horizontal';
+    } else if (vertical != null) {
+      direction = vertical;
+    } else if (horizontal != null) {
+      direction = 'to the $horizontal';
+    } else {
+      direction = 'right below the ball';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'The goal is $direction — try drawing a ramp on that side to '
+          'deflect the ball toward it.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canDraw = !_running && !_completed;
@@ -558,6 +590,12 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
       appBar: AppBar(
         title: Text('Physics Logic · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: physicsLogicDefinition,
+            ctx: widget.ctx,
+            onHint: _completed ? null : _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -609,30 +647,38 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
             ),
           ),
           Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _canvasW / _canvasH,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final scale = constraints.maxWidth / _canvasW;
-                      return GestureDetector(
-                        onPanStart: canDraw
-                            ? (d) => _handlePanStart(d.localPosition, scale)
-                            : null,
-                        onPanUpdate: canDraw
-                            ? (d) => _handlePanUpdate(d.localPosition, scale)
-                            : null,
-                        onPanEnd: canDraw ? (_) => _handlePanEnd() : null,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const padding = 12.0;
+                final innerW = constraints.maxWidth - padding * 2;
+                final innerH = constraints.maxHeight - padding * 2;
+                final scale = min(innerW / _canvasW, innerH / _canvasH);
+                final paintedW = _canvasW * scale;
+                final paintedH = _canvasH * scale;
+                final origin = Offset(
+                  padding + (innerW - paintedW) / 2,
+                  padding + (innerH - paintedH) / 2,
+                );
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart: canDraw
+                      ? (d) => _handlePanStart(d.localPosition, scale, origin)
+                      : null,
+                  onPanUpdate: canDraw
+                      ? (d) => _handlePanUpdate(d.localPosition, scale, origin)
+                      : null,
+                  onPanEnd: canDraw ? (_) => _handlePanEnd() : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(padding),
+                    child: Center(
+                      child: SizedBox(
+                        width: paintedW,
+                        height: paintedH,
                         child: AnimatedBuilder(
                           animation: _pulseController,
                           builder: (context, _) {
                             return CustomPaint(
-                              size: Size(
-                                constraints.maxWidth,
-                                constraints.maxHeight,
-                              ),
+                              size: Size(paintedW, paintedH),
                               painter: _PhysicsLogicPainter(
                                 scale: scale,
                                 spec: _spec,
@@ -644,11 +690,11 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
                             );
                           },
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
           Padding(

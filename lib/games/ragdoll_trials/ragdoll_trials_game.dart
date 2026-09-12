@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/widgets/game_actions.dart';
+import '../../core/widgets/swipe_area.dart';
 
 /// Original physics toy: a single rounded "blob" body tumbles across a
 /// side-view obstacle course under gravity while the player holds
@@ -355,6 +358,7 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
   Ticker? _ticker;
   Duration _lastElapsed = Duration.zero;
   late AnimationController _pulseController;
+  Timer? _swipePushTimer;
 
   int get _level => widget.ctx.level;
 
@@ -381,6 +385,7 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
     _ticker?.stop();
     _ticker?.dispose();
     _pulseController.dispose();
+    _swipePushTimer?.cancel();
     super.dispose();
   }
 
@@ -574,6 +579,58 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
     setState(() => _pushRightHeld = held);
   }
 
+  /// Layered on top of the existing hold-buttons, not a replacement: a
+  /// swipe on the board briefly drives the same push state the hold
+  /// buttons use, giving the same push impulse as tapping-and-releasing
+  /// the corresponding direction button rather than adding a separate
+  /// input path with its own physics.
+  void _handleSwipe(SwipeDirection direction) {
+    if (_failed || _completed) return;
+    switch (direction) {
+      case SwipeDirection.left:
+        _pulsePush(activate: _setPushLeft, deactivateOther: _setPushRight);
+      case SwipeDirection.right:
+        _pulsePush(activate: _setPushRight, deactivateOther: _setPushLeft);
+      case SwipeDirection.up:
+      case SwipeDirection.down:
+        break; // this game has no vertical control.
+    }
+  }
+
+  void _pulsePush({
+    required void Function(bool) activate,
+    required void Function(bool) deactivateOther,
+  }) {
+    deactivateOther(false);
+    activate(true);
+    _swipePushTimer?.cancel();
+    _swipePushTimer = Timer(const Duration(milliseconds: 160), () {
+      if (!mounted) return;
+      activate(false);
+    });
+  }
+
+  /// There's no stored push-sequence solution for this game — that depends
+  /// on live momentum, not just level data. This is a simple directional
+  /// nudge toward the goal rect's center, same style as physics_logic and
+  /// snip_logic, not a physics solver.
+  void _showHint() {
+    if (_failed || _completed) return;
+    final goalCenter = _spec.goal.center;
+    final delta = goalCenter - _pos;
+    final horizontal = delta.dx.abs() < 15
+        ? 'directly below'
+        : (delta.dx > 0 ? 'to the right' : 'to the left');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'The goal is $horizontal — push that way and ease off before '
+          'you reach it so the blob settles instead of rolling through.',
+        ),
+      ),
+    );
+  }
+
   // --- UI --------------------------------------------------------------
 
   @override
@@ -582,6 +639,12 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
       appBar: AppBar(
         title: Text('Ragdoll Trials · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: ragdollTrialsDefinition,
+            ctx: widget.ctx,
+            onHint: (_failed || _completed) ? null : _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),
@@ -617,48 +680,55 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
             ),
           ),
           Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _canvasW / _canvasH,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Stack(
-                    children: [
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return AnimatedBuilder(
-                            animation: _pulseController,
-                            builder: (context, _) {
-                              return CustomPaint(
-                                size: Size(
-                                  constraints.maxWidth,
-                                  constraints.maxHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const padding = 12.0;
+                final innerW = constraints.maxWidth - padding * 2;
+                final innerH = constraints.maxHeight - padding * 2;
+                final scale = min(innerW / _canvasW, innerH / _canvasH);
+                final paintedW = _canvasW * scale;
+                final paintedH = _canvasH * scale;
+                return SwipeArea(
+                  onSwipe: _handleSwipe,
+                  child: Padding(
+                    padding: const EdgeInsets.all(padding),
+                    child: Center(
+                      child: SizedBox(
+                        width: paintedW,
+                        height: paintedH,
+                        child: Stack(
+                          children: [
+                            AnimatedBuilder(
+                              animation: _pulseController,
+                              builder: (context, _) {
+                                return CustomPaint(
+                                  size: Size(paintedW, paintedH),
+                                  painter: _RagdollTrialsPainter(
+                                    scale: scale,
+                                    spec: _spec,
+                                    pos: _pos,
+                                    visualRotation: _visualRotation,
+                                    elapsedSeconds: _elapsedSeconds,
+                                    pulse: _pulseController.value,
+                                  ),
+                                );
+                              },
+                            ),
+                            if (_failed || _completed)
+                              Positioned.fill(
+                                child: Container(
+                                  color: Colors.black.withValues(alpha: 0.55),
+                                  alignment: Alignment.center,
+                                  child: _failed ? _buildFailBanner() : null,
                                 ),
-                                painter: _RagdollTrialsPainter(
-                                  scale: constraints.maxWidth / _canvasW,
-                                  spec: _spec,
-                                  pos: _pos,
-                                  visualRotation: _visualRotation,
-                                  elapsedSeconds: _elapsedSeconds,
-                                  pulse: _pulseController.value,
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      if (_failed || _completed)
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            alignment: Alignment.center,
-                            child: _failed ? _buildFailBanner() : null,
-                          ),
+                              ),
+                          ],
                         ),
-                    ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
           _buildControls(),

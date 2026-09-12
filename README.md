@@ -1,6 +1,6 @@
 # Puzzle Vault
 
-A single Flutter app (iOS + Android) bundling 20 original, offline-only puzzle
+A single Flutter app (iOS + Android) bundling 19 original, offline-only puzzle
 and logic mini-games behind one generic shell: home grid, level select,
 settings, and progress persistence.
 
@@ -11,7 +11,7 @@ saves locally on-device via `shared_preferences`.
 
 | Title | Tagline | Mode |
 |---|---|---|
-| Number Grid | Classic 9x9 number logic | 15 levels |
+| Sudoku | Classic 9x9 number logic | 15 levels |
 | Number Merge | Slide and merge tiles to reach 2048 | Endless |
 | Rule Puzzle | Push words to rewrite the rules | 15 levels |
 | Path Rotate | Rotate tiles to connect the path | 15 levels |
@@ -25,7 +25,6 @@ saves locally on-device via `shared_preferences`.
 | Rule Manual | Follow the manual, defuse the device | 15 levels |
 | Draw Physics | Draw shapes to guide the ball home | 15 levels |
 | Brain Trick | Read carefully — the obvious answer is a trap | 15 levels |
-| Sequence Merge | Slide 1s and 2s together to build up to big numbers | Endless |
 | Pipe Connect | Link every matching pair without crossing | 15 levels |
 | Slide Escape | Slide blocks aside to free the exit path | 15 levels |
 | Rope Cut | Cut ropes at the right moment to land the parcel | 15 levels |
@@ -33,9 +32,15 @@ saves locally on-device via `shared_preferences`.
 | Squad Battle | Command your squad to victory | 15 levels |
 
 Every game is an original implementation of a generic/public-domain puzzle
-mechanic (or a loosely-inspired original mechanic) — original names, original
-art (drawn with Flutter widgets, no image assets), and original level data.
-See `CONTEXT.md` for the IP-safety rationale behind each game.
+mechanic (or a loosely-inspired original mechanic) — original names (except
+"Sudoku", a generic public-domain puzzle name), original art (drawn with
+Flutter widgets, no image assets), and original level data. See `CONTEXT.md`
+for the IP-safety rationale behind each game.
+
+A 20th game, "Sequence Merge" ("Threes"-style: slide 1s and 2s together),
+was removed — it shared the same grid, swipe gesture, and slide/merge/spawn
+engine as "Number Merge" (2048-style), differing only in the merge rule. See
+`CONTEXT.md` for the dedup rationale.
 
 ## Features
 

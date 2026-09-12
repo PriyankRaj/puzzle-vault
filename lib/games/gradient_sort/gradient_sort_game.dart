@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original mechanic: the player is shown one or more shuffled rows of
 /// color chips, each row sampled along a smooth hue/lightness gradient
@@ -188,12 +189,46 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
     }
   }
 
+  /// Reuses the same cycle-decomposition logic as [_minSwaps] to find one
+  /// swap that brings a chip home, then performs it through [_onTapChip]
+  /// exactly as if the player had tapped those two chips — so it's a
+  /// genuine correct move, not a duplicated swap implementation.
+  void _showHint() {
+    for (var laneIndex = 0; laneIndex < _lanes.length; laneIndex++) {
+      final lane = _lanes[laneIndex];
+      for (var i = 0; i < lane.length; i++) {
+        if (lane.order[i] != i) {
+          final j = lane.order[i];
+          _onTapChip(laneIndex, i);
+          _onTapChip(laneIndex, j);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Swapped two chips in row ${laneIndex + 1} closer to sorted.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Every row is already sorted!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Gradient Sort · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: gradientSortDefinition,
+            ctx: widget.ctx,
+            onHint: _showHint,
+          ),
           TextButton(
             onPressed: widget.ctx.onExit,
             child: const Text('Give up'),

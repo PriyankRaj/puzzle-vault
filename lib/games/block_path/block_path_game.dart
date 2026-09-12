@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -6,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/game_actions.dart';
 
 /// Original puzzle: an isometric-look terrain of raised/lowered "blocks".
 /// A token steps across orthogonally-adjacent blocks (never diagonally),
@@ -447,6 +449,61 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     }
   }
 
+  _Cell _applyDirection(_Cell cell, String dir) {
+    switch (dir) {
+      case 'N':
+        return (cell.$1 - 1, cell.$2);
+      case 'S':
+        return (cell.$1 + 1, cell.$2);
+      case 'E':
+        return (cell.$1, cell.$2 + 1);
+      case 'W':
+        return (cell.$1, cell.$2 - 1);
+    }
+    return cell;
+  }
+
+  /// [_LevelSpec.verifiedSolutionSteps] is only guaranteed correct along
+  /// its own exact cell-by-cell path. This reveals the next scripted step
+  /// only when the player's current position is somewhere on that
+  /// canonical path already; otherwise it's honest about the limitation
+  /// rather than suggesting a move that might not make sense from wherever
+  /// the player actually is.
+  void _showHint() {
+    if (_finished) return;
+    final steps = _spec.verifiedSolutionSteps;
+    var cell = _spec.start;
+    var matchedIndex = cell == _current ? 0 : -1;
+    for (var i = 0; i < steps.length; i++) {
+      cell = _applyDirection(cell, steps[i]);
+      if (cell == _current) {
+        matchedIndex = i + 1;
+        break;
+      }
+    }
+    if (matchedIndex == -1 || matchedIndex >= steps.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hint only works while you\'re on the known solution path — '
+            'try Restart first, then ask for a hint again.',
+          ),
+        ),
+      );
+      return;
+    }
+    final direction = switch (steps[matchedIndex]) {
+      'N' => 'up',
+      'S' => 'down',
+      'E' => 'right',
+      'W' => 'left',
+      _ => 'forward',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Step $direction next.')));
+  }
+
   void _restart() {
     _flashTimer?.cancel();
     setState(() {
@@ -457,43 +514,64 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     });
   }
 
-  Offset _screenPos(_Cell cell, {double? elevationOverride}) {
+  /// Normalized hit-test slop: the diamond hit-test below accepts taps
+  /// with `dx + dy` (each already normalized by tile half-width/height) up
+  /// to this much past 1.0, so a near-miss on a diamond edge still
+  /// registers instead of silently missing.
+  static const double _hitSlopFactor = 0.18;
+
+  /// All isometric geometry below is parameterized by [scale] — the board
+  /// no longer has one fixed pixel size; [scale] is computed per-build from
+  /// available layout space (see `build`) so the whole board grows/shrinks
+  /// to fill the screen instead of using the same hardcoded tile size on
+  /// every device. Passing `scale: 1.0` gives the natural/unscaled size
+  /// used only to figure out how much scale is available.
+  Offset _screenPos(_Cell cell, double scale, {double? elevationOverride}) {
     final elevation = elevationOverride ?? (_elevationAt(cell) ?? 0).toDouble();
     final r = cell.$1;
     final c = cell.$2;
-    final offsetX = _spec.rows * _tileHalfWidth;
-    final offsetY = 3 * _elevationHeight + _tileHalfHeight + 24;
-    final x = (c - r) * _tileHalfWidth + offsetX;
-    final y =
-        (c + r) * _tileHalfHeight - elevation * _elevationHeight + offsetY;
+    final tileHalfWidth = _tileHalfWidth * scale;
+    final tileHalfHeight = _tileHalfHeight * scale;
+    final elevationHeight = _elevationHeight * scale;
+    final offsetX = _spec.rows * tileHalfWidth;
+    final offsetY = 3 * elevationHeight + tileHalfHeight + 24 * scale;
+    final x = (c - r) * tileHalfWidth + offsetX;
+    final y = (c + r) * tileHalfHeight - elevation * elevationHeight + offsetY;
     return Offset(x, y);
   }
 
-  Size _boardSize() {
-    final width = (_spec.rows + _spec.cols) * _tileHalfWidth;
+  Size _boardSize(double scale) {
+    final tileHalfWidth = _tileHalfWidth * scale;
+    final tileHalfHeight = _tileHalfHeight * scale;
+    final elevationHeight = _elevationHeight * scale;
+    final cubeDepth = _cubeDepth * scale;
+    final width = (_spec.rows + _spec.cols) * tileHalfWidth;
     final height =
-        (_spec.rows + _spec.cols) * _tileHalfHeight +
-        3 * _elevationHeight +
-        _cubeDepth +
-        60;
+        (_spec.rows + _spec.cols) * tileHalfHeight +
+        3 * elevationHeight +
+        cubeDepth +
+        60 * scale;
     return Size(width, height);
   }
 
-  Offset _tokenTopLeft() {
-    final radius = _tileHalfHeight * 0.75;
-    final center = _screenPos(_current) - Offset(0, _tileHalfHeight * 0.55);
+  Offset _tokenTopLeft(double scale) {
+    final radius = _tileHalfHeight * scale * 0.75;
+    final center =
+        _screenPos(_current, scale) - Offset(0, _tileHalfHeight * scale * 0.55);
     return center - Offset(radius, radius);
   }
 
-  _Cell? _hitTest(Offset localPos) {
+  _Cell? _hitTest(Offset localPos, double scale) {
+    final tileHalfWidth = _tileHalfWidth * scale;
+    final tileHalfHeight = _tileHalfHeight * scale;
     _Cell? best;
     for (var r = 0; r < _spec.rows; r++) {
       for (var c = 0; c < _spec.cols; c++) {
         if (_spec.grid[r][c] == null) continue;
-        final center = _screenPos((r, c));
-        final dx = (localPos.dx - center.dx).abs() / _tileHalfWidth;
-        final dy = (localPos.dy - center.dy).abs() / _tileHalfHeight;
-        if (dx + dy <= 1.0) {
+        final center = _screenPos((r, c), scale);
+        final dx = (localPos.dx - center.dx).abs() / tileHalfWidth;
+        final dy = (localPos.dy - center.dy).abs() / tileHalfHeight;
+        if (dx + dy <= 1.0 + _hitSlopFactor) {
           best = (r, c);
         }
       }
@@ -503,11 +581,17 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = _boardSize();
+    final naturalSize = _boardSize(1.0);
     return Scaffold(
       appBar: AppBar(
         title: Text('Block Path · Level $_level'),
         actions: [
+          ...gameActions(
+            context: context,
+            def: blockPathDefinition,
+            ctx: widget.ctx,
+            onHint: _finished ? null : _showHint,
+          ),
           TextButton(onPressed: _restart, child: const Text('Restart')),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
@@ -539,38 +623,55 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
           ),
           Expanded(
             child: Center(
-              child: SizedBox(
-                width: size.width,
-                height: size.height,
-                child: GestureDetector(
-                  onTapUp: (details) {
-                    final hit = _hitTest(details.localPosition);
-                    if (hit != null) _tapCell(hit);
-                  },
-                  child: Stack(
-                    children: [
-                      CustomPaint(
-                        size: size,
-                        painter: _BlockPathPainter(
-                          spec: _spec,
-                          flashCell: _flashCell,
-                          tileHalfWidth: _tileHalfWidth,
-                          tileHalfHeight: _tileHalfHeight,
-                          elevationHeight: _elevationHeight,
-                          cubeDepth: _cubeDepth,
-                          screenPos: _screenPos,
-                        ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  var scale = min(
+                    constraints.maxWidth / naturalSize.width,
+                    constraints.maxHeight / naturalSize.height,
+                  );
+                  if (!scale.isFinite || scale <= 0) scale = 1.0;
+                  final size = _boardSize(scale);
+                  return SizedBox(
+                    width: size.width,
+                    height: size.height,
+                    child: GestureDetector(
+                      onTapUp: (details) {
+                        final hit = _hitTest(details.localPosition, scale);
+                        if (hit != null) _tapCell(hit);
+                      },
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            size: size,
+                            painter: _BlockPathPainter(
+                              spec: _spec,
+                              flashCell: _flashCell,
+                              tileHalfWidth: _tileHalfWidth * scale,
+                              tileHalfHeight: _tileHalfHeight * scale,
+                              elevationHeight: _elevationHeight * scale,
+                              cubeDepth: _cubeDepth * scale,
+                              screenPos: (cell, {elevationOverride}) =>
+                                  _screenPos(
+                                    cell,
+                                    scale,
+                                    elevationOverride: elevationOverride,
+                                  ),
+                            ),
+                          ),
+                          AnimatedPositioned(
+                            duration: Motion.ms(220),
+                            curve: Curves.easeOut,
+                            left: _tokenTopLeft(scale).dx,
+                            top: _tokenTopLeft(scale).dy,
+                            child: _PlayerToken(
+                              radius: _tileHalfHeight * scale * 0.75,
+                            ),
+                          ),
+                        ],
                       ),
-                      AnimatedPositioned(
-                        duration: Motion.ms(220),
-                        curve: Curves.easeOut,
-                        left: _tokenTopLeft().dx,
-                        top: _tokenTopLeft().dy,
-                        child: _PlayerToken(radius: _tileHalfHeight * 0.75),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
