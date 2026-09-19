@@ -4,5 +4,5 @@
          gradient (see assets/icon/icon.png), since an adaptive icon's
          background layer must be a single flat color/drawable, not a
          gradient. -->
-    <color name="ic_launcher_background">#1E2982</color>
+    <color name="ic_launcher_background">#121B72</color>
 </resources>

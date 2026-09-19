@@ -34,7 +34,7 @@ class PuzzleVaultApp extends StatelessWidget {
           valueListenable: settings.animationsEnabled,
           builder: (context, animate, _) {
             return MaterialApp(
-              title: 'Puzzle Vault',
+              title: 'Brainers Time!',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.light(animate: animate),
               darkTheme: AppTheme.dark(animate: animate),

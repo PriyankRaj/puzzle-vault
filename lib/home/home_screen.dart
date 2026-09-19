@@ -21,7 +21,7 @@ class HomeScreen extends StatelessWidget {
       builder: (context, _, _) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Puzzle Vault'),
+            title: const Text('Brainers Time!'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.settings_rounded),

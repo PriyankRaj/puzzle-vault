@@ -16,6 +16,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('Puzzle Vault'), findsOneWidget);
+    expect(find.text('Brainers Time!'), findsOneWidget);
   });
 }
