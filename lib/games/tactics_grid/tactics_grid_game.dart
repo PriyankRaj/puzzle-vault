@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original turn-based squad-tactics battle. The player commands 2-3 units
@@ -23,11 +24,17 @@ final GameDefinition tacticsGridDefinition = GameDefinition(
   mode: GameMode.levels,
   levelCount: 15,
   helpText:
-      'Tap one of your units, then tap a highlighted tile to move it or a '
-      'red tile to attack an enemy in range. Each unit can move and attack '
-      'once per turn before the enemy squad takes its turn automatically. '
-      'Defeat every enemy unit to win — losing all your units ends the '
-      'battle. Fewer turns earns more stars.',
+      'Tap one of your units, then tap a blue tile to move it or a red '
+      'tile to attack an enemy in range — moving and attacking both use '
+      'that unit\'s one action for the turn, so pick whichever matters '
+      'more. Long-press a unit or enemy to see its exact stats. '
+      'Your squad: Guardian (high HP, short range — tank hits and screen '
+      'the others), Marksman (long range, fragile — snipe from a '
+      'distance, keep it away from melee), Scout (fast, short range — '
+      'dash in to finish a weakened enemy or peel back to safety). Once '
+      'every unit has acted, tap "End Turn" and the enemy squad moves '
+      'automatically. Defeat every enemy to win — losing your whole squad '
+      'ends the battle. Fewer turns earns more stars.',
   builder: (context, ctx) => TacticsGridScreen(ctx: ctx),
 );
 
@@ -488,6 +495,12 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
   Set<Point<int>> _reachable = {};
   Set<Point<int>> _attackable = {};
 
+  /// One-time first-turn nudge on level 1 only — dismissed for good the
+  /// moment the player makes any move, not persisted across app restarts
+  /// (a full ProgressStore flag would outlive its usefulness after the
+  /// player has clearly already learned the loop).
+  late bool _showIntro;
+
   int get _level => widget.ctx.level;
   _Level get _def => _levels[_level - 1];
 
@@ -513,6 +526,7 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     _selected = null;
     _reachable = {};
     _attackable = {};
+    _showIntro = _level == 1;
   }
 
   bool _blocked(Point<int> p, List<_Unit> units, _Unit ignore) {
@@ -576,6 +590,7 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
   void _selectFriendly(_Unit u) {
     if (_phase != _Phase.player || u.acted || !u.alive) return;
     setState(() {
+      _showIntro = false;
       _selected = u;
       final steps = _reachableSteps(u, _friendlies, _enemies);
       _reachable = steps.keys.where((p) => p != u.pos).toSet();
@@ -797,6 +812,14 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
 
   void _onRetry() => setState(_reset);
 
+  /// Same-level restart reachable at any time via the shared "Restart
+  /// level" AppBar action, distinct from [_onRetry] (which only appears
+  /// after a loss) only in that it's available mid-battle too.
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_reset);
+  }
+
   _Unit? _friendlyAt(Point<int> p) =>
       _friendlies.where((f) => f.alive && f.pos == p).firstOrNull;
 
@@ -850,33 +873,51 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
     );
   }
 
+  String _unitTooltip(_Unit u) =>
+      '${_unitLabel(u.type)}\nHP ${u.hp}/${u.maxHp} · ATK ${u.atk} · '
+      'Move ${u.move} · Range ${u.range}';
+
   Widget _unitToken(_Unit u, bool isFriendly, double cellSize) {
     final color = isFriendly ? AppTheme.accent : AppTheme.danger;
     final selected = _selected == u;
     final tokenSize = (cellSize * 0.7).clamp(24.0, 44.0);
     final iconSize = (cellSize * 0.4).clamp(14.0, 24.0);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _hpBar(u, isFriendly ? AppTheme.success : AppTheme.danger, cellSize),
-        Container(
-          width: tokenSize,
-          height: tokenSize,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.85),
-            shape: BoxShape.circle,
-            border: selected
-                ? Border.all(color: AppTheme.textPrimary, width: 2)
-                : null,
+    // FittedBox lets the whole token (hp bar + circle) scale down together
+    // when a cell is smaller than this content's natural size (e.g. a
+    // narrow phone on a wide 8x8 board), instead of overflowing the cell —
+    // the clamps above set a comfortable size, not a hard minimum the cell
+    // is guaranteed to have room for.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _hpBar(u, isFriendly ? AppTheme.success : AppTheme.danger, cellSize),
+          Container(
+            width: tokenSize,
+            height: tokenSize,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.85),
+              shape: BoxShape.circle,
+              border: selected
+                  ? Border.all(color: AppTheme.textPrimary, width: 2)
+                  : null,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              _iconOf(u.type),
+              size: iconSize,
+              color: AppTheme.background,
+            ),
           ),
-          alignment: Alignment.center,
-          child: Icon(
-            _iconOf(u.type),
-            size: iconSize,
-            color: AppTheme.background,
-          ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  void _showUnitInfo(_Unit u) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_unitTooltip(u).replaceAll('\n', ' · '))),
     );
   }
 
@@ -904,8 +945,10 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
       content = _unitToken(enemy, false, cellSize);
     }
 
+    final occupant = friend ?? enemy;
     return GestureDetector(
       onTap: () => _onCellTap(r, c),
+      onLongPress: occupant == null ? null : () => _showUnitInfo(occupant),
       child: Container(
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
@@ -939,10 +982,12 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
             def: tacticsGridDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -953,38 +998,81 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Turn: $_turn',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _phase == _Phase.enemy
-                            ? AppTheme.danger.withValues(alpha: 0.2)
-                            : AppTheme.accentSoft.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    Expanded(
                       child: Text(
-                        bannerText,
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontWeight: FontWeight.w600,
+                        'Turn: $_turn',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _phase == _Phase.enemy
+                              ? AppTheme.danger.withValues(alpha: 0.2)
+                              : AppTheme.accentSoft.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          bannerText,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 6),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
                       onPressed: _phase == _Phase.player ? _onEndTurn : null,
                       child: const Text('End Turn'),
                     ),
                   ],
                 ),
               ),
+              if (_showIntro)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentSoft.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline_rounded,
+                          color: AppTheme.accent,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Tap a unit to see where it can move (blue) or '
+                            'attack (red) this turn. Long-press a unit or '
+                            'enemy for its stats. Not sure who to use? The '
+                            'hint button (top right) will suggest a move.',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Expanded(
                 child: Center(
                   child: AspectRatio(
@@ -1017,7 +1105,7 @@ class _TacticsGridScreenState extends State<TacticsGridScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                 child: Text(
                   'Tap a unit, then a highlighted tile to move and a red tile to attack',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
               ),

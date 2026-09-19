@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original puzzle: a grid holds several rectangular blocks. Every block is
@@ -683,6 +684,7 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
   }
 
   void _restart() {
+    Sfx.tap();
     setState(_resetPositions);
   }
 
@@ -722,15 +724,18 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Slide Escape · Level $_level'),
+        title: Text(
+          'Slide Escape · Level $_level',
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           ...gameActions(
             context: context,
             def: slideEscapeDefinition,
             ctx: widget.ctx,
             onHint: _won ? null : _showHint,
+            onRestart: _restart,
           ),
-          TextButton(onPressed: _restart, child: const Text('Restart')),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
@@ -739,17 +744,24 @@ class _SlideEscapeScreenState extends State<SlideEscapeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Moves: $_moves',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Moves: $_moves',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                Text(
-                  _won ? 'Escaped!' : 'Slide the target block to the exit',
-                  style: TextStyle(
-                    color: _won ? AppTheme.success : AppTheme.textSecondary,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _won ? 'Escaped!' : 'Slide the target block to the exit',
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _won ? AppTheme.success : AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

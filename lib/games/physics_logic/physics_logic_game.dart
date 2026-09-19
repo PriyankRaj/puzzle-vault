@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original physics sandbox: a ball falls under gravity toward a goal zone.
@@ -330,6 +331,28 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
     });
   }
 
+  /// Full same-level restart: back to the just-started state (ball back at
+  /// its spawn point, no velocity, drawing and ink budget cleared), without
+  /// leaving the screen or touching progress. Distinct from [_resetBall]
+  /// (keeps the drawn strokes, just re-drops the ball) and from "Reset
+  /// progress" in `gameActions()` (wipes star/level progress for the whole
+  /// game). Stops the physics ticker rather than disposing it — the same
+  /// ticker is reused by the next [_launch].
+  void _restartLevel() {
+    if (_running) _ticker?.stop();
+    Sfx.tap();
+    setState(() {
+      _ballPos = _spec.ballStart;
+      _ballVel = Offset.zero;
+      _strokes.clear();
+      _currentStroke = null;
+      _inkUsed = 0;
+      _running = false;
+      _completed = false;
+      _settleCounter = 0;
+    });
+  }
+
   void _clearDrawing() {
     if (_running || _completed) return;
     setState(() {
@@ -574,8 +597,8 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'The goal is $direction — try drawing a ramp on that side to '
-          'deflect the ball toward it.',
+          'Home is $direction — draw a ramp on that side to send it '
+          'rolling that way.',
         ),
       ),
     );
@@ -595,10 +618,12 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
             def: physicsLogicDefinition,
             ctx: widget.ctx,
             onHint: _completed ? null : _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -607,24 +632,31 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Ink left: ${remaining.toStringAsFixed(0)} / ${_spec.inkBudget.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Ink left: ${remaining.toStringAsFixed(0)} / ${_spec.inkBudget.toStringAsFixed(0)}',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                Text(
-                  _completed
-                      ? 'Settled!'
-                      : (_running ? 'Simulating…' : 'Draw, then launch'),
-                  style: TextStyle(
-                    color: _completed
-                        ? AppTheme.success
-                        : AppTheme.textSecondary,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _completed
+                        ? 'Home safe!'
+                        : (_running ? 'Wheee—rolling…' : 'Draw, then launch'),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _completed
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -683,6 +715,9 @@ class _PhysicsLogicScreenState extends State<PhysicsLogicScreen>
                                 scale: scale,
                                 spec: _spec,
                                 ballPos: _ballPos,
+                                ballVel: _ballVel,
+                                running: _running,
+                                completed: _completed,
                                 strokes: _strokes,
                                 currentStroke: _currentStroke,
                                 pulse: _pulseController.value,
@@ -737,6 +772,9 @@ class _PhysicsLogicPainter extends CustomPainter {
     required this.scale,
     required this.spec,
     required this.ballPos,
+    required this.ballVel,
+    required this.running,
+    required this.completed,
     required this.strokes,
     required this.currentStroke,
     required this.pulse,
@@ -745,6 +783,9 @@ class _PhysicsLogicPainter extends CustomPainter {
   final double scale;
   final _LevelSpec spec;
   final Offset ballPos;
+  final Offset ballVel;
+  final bool running;
+  final bool completed;
   final List<List<Offset>> strokes;
   final List<Offset>? currentStroke;
   final double pulse;
@@ -785,7 +826,9 @@ class _PhysicsLogicPainter extends CustomPainter {
       );
     }
 
-    // Goal zone (pulsing).
+    // Goal zone (pulsing) — drawn as a friendly little "burrow" with a face
+    // that watches the ball, so it reads as somewhere the ball is trying to
+    // get *home* to rather than just a scoring hole.
     final pulseAlpha = 0.30 + 0.25 * pulse;
     canvas.drawCircle(
       spec.goalCenter,
@@ -800,6 +843,7 @@ class _PhysicsLogicPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
+    _drawGoalFace(canvas);
 
     // Player strokes.
     final strokePaint = Paint()
@@ -825,25 +869,157 @@ class _PhysicsLogicPainter extends CustomPainter {
       );
     }
 
-    // Ball.
+    // Ball — a little character, not just a dot: it squashes/stretches
+    // along its direction of travel and keeps an upright, reactive face.
+    _drawBall(canvas);
+
+    canvas.restore();
+  }
+
+  void _drawGoalFace(Canvas canvas) {
+    final r = spec.goalRadius;
+    final toBall = ballPos - spec.goalCenter;
+    final lookDist = toBall.distance;
+    // Pupils nudge toward the ball (clamped so they never leave the
+    // socket) — the goal is "watching" for the ball to arrive.
+    final look = lookDist > 1
+        ? toBall / lookDist * (r * 0.12).clamp(0, r * 0.16)
+        : Offset.zero;
+    final eyeY = spec.goalCenter.dy - r * 0.15;
+    final eyeDx = r * 0.32;
+    final eyeR = r * 0.13;
+    for (final side in [-1, 1]) {
+      final socket = Offset(
+        spec.goalCenter.dx + eyeDx * side,
+        eyeY,
+      );
+      canvas.drawCircle(socket, eyeR, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        socket + look,
+        eyeR * 0.55,
+        Paint()..color = const Color(0xFF14261F),
+      );
+    }
+    // A small welcoming smile.
+    final smileRect = Rect.fromCenter(
+      center: Offset(spec.goalCenter.dx, spec.goalCenter.dy + r * 0.05),
+      width: r * 0.7,
+      height: r * 0.5,
+    );
+    canvas.drawArc(
+      smileRect,
+      0.25,
+      pi - 0.5,
+      false,
+      Paint()
+        ..color = const Color(0xFF14261F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.09
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  void _drawBall(Canvas canvas) {
+    final speed = ballVel.distance;
+    // Idle bob before launch/after a fresh reset, purely decorative —
+    // the physics state (ballPos) itself never changes from this.
+    final bob = (!running && !completed) ? (pulse - 0.5) * 4 : 0.0;
+    final center = ballPos + Offset(0, bob);
+
+    // Shadow stays put on the "ground" — not stretched/rotated with the
+    // ball — so the squash-stretch below reads as the ball's own body.
     canvas.drawCircle(
-      ballPos,
+      center,
       _ballRadius,
       Paint()
         ..color = Colors.black.withValues(alpha: 0.3)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
-    canvas.drawCircle(ballPos, _ballRadius, Paint()..color = AppTheme.accent);
-    canvas.drawCircle(
-      ballPos,
-      _ballRadius,
+
+    final normSpeed = (speed / 700).clamp(0.0, 1.0);
+    final stretch = 1 + normSpeed * 0.32;
+    final squash = 1 - normSpeed * 0.22;
+    final angle = speed > 12 ? atan2(ballVel.dy, ballVel.dx) : 0.0;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    final bodyRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: _ballRadius * 2 * stretch,
+      height: _ballRadius * 2 * squash,
+    );
+    canvas.drawOval(bodyRect, Paint()..color = AppTheme.accent);
+    canvas.drawOval(
+      bodyRect,
       Paint()
         ..color = Colors.black.withValues(alpha: 0.25)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
-
+    // A soft highlight so the body reads as a rounded character, not a
+    // flat disc.
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(-_ballRadius * 0.35, -_ballRadius * 0.4),
+        width: _ballRadius * 0.9,
+        height: _ballRadius * 0.55,
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.35),
+    );
     canvas.restore();
+
+    // Face stays upright (not rotated with the body) so it always reads
+    // clearly, and reacts to what's happening: wide "whee" eyes while
+    // falling fast, a settled smile once home, otherwise a calm default.
+    final distToGoal = (center - spec.goalCenter).distance;
+    final nearGoal = distToGoal < spec.goalRadius * 2.2;
+    final eyeOpen = completed ? 0.55 : (0.75 + normSpeed * 0.35);
+    final eyeR = _ballRadius * 0.24 * eyeOpen;
+    final eyeDx = _ballRadius * 0.32;
+    final eyeDy = -_ballRadius * 0.12;
+    final lookDir = speed > 12
+        ? Offset(cos(angle), sin(angle)) * (_ballRadius * 0.08)
+        : Offset.zero;
+    for (final side in [-1, 1]) {
+      final socket = center + Offset(eyeDx * side, eyeDy);
+      canvas.drawCircle(socket, eyeR, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        socket + lookDir,
+        eyeR * 0.55,
+        Paint()..color = const Color(0xFF10233F),
+      );
+    }
+    final mouthPaint = Paint()
+      ..color = const Color(0xFF10233F)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _ballRadius * 0.14
+      ..strokeCap = StrokeCap.round;
+    final mouthCenter = center + Offset(0, _ballRadius * 0.32);
+    if (completed || nearGoal) {
+      // Happy smile.
+      canvas.drawArc(
+        Rect.fromCenter(
+          center: mouthCenter,
+          width: _ballRadius * 0.9,
+          height: _ballRadius * 0.6,
+        ),
+        0.2,
+        pi - 0.4,
+        false,
+        mouthPaint,
+      );
+    } else if (normSpeed > 0.35) {
+      // Wide-eyed "whee" — an open little "o" mouth while zipping along.
+      canvas.drawCircle(mouthCenter, _ballRadius * 0.16, mouthPaint);
+    } else {
+      // Calm, neutral default.
+      canvas.drawLine(
+        mouthCenter - Offset(_ballRadius * 0.18, 0),
+        mouthCenter + Offset(_ballRadius * 0.18, 0),
+        mouthPaint,
+      );
+    }
   }
 
   @override

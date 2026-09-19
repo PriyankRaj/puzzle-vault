@@ -315,6 +315,14 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  /// Builds/rebuilds the grid, connectivity and tap counter for the current
+  /// level from scratch — called by [initState] and by [_restartLevel].
+  void _setupLevel() {
+    _taps = 0;
+    _completed = false;
     _spec = _levels[(_level - 1).clamp(0, _levels.length - 1)];
     _startPos = _spec.path.first;
     _goalPos = _spec.path.last;
@@ -435,6 +443,13 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
     Future.microtask(() => widget.ctx.onComplete(stars: stars));
   }
 
+  /// Same-level do-over: re-scrambles this level back to its just-started
+  /// state without leaving the screen or touching progress/star grading.
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_setupLevel);
+  }
+
   /// Nudges one mis-rotated path tile a single step closer to its solved
   /// orientation (mirroring exactly what a real tap on that tile does) and
   /// announces which tile it touched. This is always a genuine correct move
@@ -484,6 +499,7 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
             def: impossiblePathsDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
@@ -493,17 +509,26 @@ class _ImpossiblePathsScreenState extends State<ImpossiblePathsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Taps: $_taps',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Taps: $_taps',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                Text(
-                  solved ? 'Connected!' : 'Not connected',
-                  style: TextStyle(
-                    color: solved ? AppTheme.success : AppTheme.textSecondary,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    solved ? 'Connected!' : 'Not connected',
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: solved
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

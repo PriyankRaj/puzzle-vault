@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original mechanic: the player is shown one or more shuffled rows of
@@ -74,6 +75,13 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  /// Builds this level's lanes from its fixed per-level seed, so calling
+  /// this again (from [_restartLevel]) reproduces the exact same starting
+  /// shuffle rather than a fresh random one.
+  void _setupLevel() {
     final rng = Random(5000 + _level);
 
     final laneCount = _level <= 5
@@ -85,6 +93,20 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
 
     _lanes = List.generate(laneCount, (_) => _buildLane(rng, chipCount));
     _totalMinSwaps = _lanes.fold(0, (sum, lane) => sum + lane.minSwaps);
+  }
+
+  /// Restores this level's starting arrangement in place — same seed, same
+  /// shuffle, swap count and selection cleared — without leaving the screen
+  /// or touching progress.
+  void _restartLevel() {
+    Sfx.tap();
+    setState(() {
+      _swapCount = 0;
+      _finished = false;
+      _selectedLane = null;
+      _selectedChip = null;
+      _setupLevel();
+    });
   }
 
   _Lane _buildLane(Random rng, int chipCount) {
@@ -228,10 +250,12 @@ class _GradientSortScreenState extends State<GradientSortScreen> {
             def: gradientSortDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),

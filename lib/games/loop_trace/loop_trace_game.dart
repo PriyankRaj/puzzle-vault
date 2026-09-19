@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original implementation of the well-known, generic "draw a single loop
@@ -294,7 +295,12 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
     _vOn = List.generate(_n, (_) => List.filled(_n + 1, false));
   }
 
-  void _clear() {
+  /// Resets the current attempt's edges back to blank, keeping the same
+  /// puzzle (generation is deterministic per level, so there's nothing
+  /// else to regenerate). Used both by the "Restart level" action and
+  /// internally wherever a full board wipe is needed.
+  void _restartLevel() {
+    Sfx.tap();
     setState(() {
       _hOn = List.generate(_n + 1, (_) => List.filled(_n, false));
       _vOn = List.generate(_n, (_) => List.filled(_n + 1, false));
@@ -404,18 +410,19 @@ class _LoopTraceScreenState extends State<LoopTraceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Level $_level'),
+        title: Text('Level $_level', overflow: TextOverflow.ellipsis),
         actions: [
           ...gameActions(
             context: context,
             def: loopTraceDefinition,
             ctx: widget.ctx,
             onHint: _solved ? null : _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(onPressed: _clear, child: const Text('Clear')),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_rounded),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),

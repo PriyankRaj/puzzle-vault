@@ -124,4 +124,41 @@ void main() {
       expect(find.text('Parcel lost'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'snip_logic: restart level resets ropes and bumps the retry count '
+    'without opening the failed dialog',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SnipLogicScreen(
+            ctx: GameLevelContext(
+              gameId: 'snip_logic',
+              level: 1,
+              isEndless: false,
+              onComplete: ({int stars = 0, int? score}) {},
+              onExit: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final rect = canvasRect(tester);
+      final scale = rect.width / 400;
+      Offset toGlobal(double x, double y) =>
+          rect.topLeft + Offset(x * scale, y * scale);
+
+      await tester.tapAt(toGlobal(200, 120));
+      await tester.pump();
+      expect(find.text('Falling…'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Restart level'));
+      await tester.pump();
+
+      expect(find.text('Tap a rope to cut it (1 left)'), findsOneWidget);
+      expect(find.text('Retries: 1'), findsOneWidget);
+      expect(find.text('Parcel lost'), findsNothing);
+    },
+  );
 }

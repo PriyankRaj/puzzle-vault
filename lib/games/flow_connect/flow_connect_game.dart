@@ -1310,10 +1310,12 @@ class _FlowConnectScreenState extends State<FlowConnectScreen> {
             def: flowConnectDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _clearAll,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),

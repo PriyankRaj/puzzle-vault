@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: classic grid-toggle logic puzzle (public
@@ -44,12 +45,21 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  /// Builds this level's starting grid deterministically from its level
+  /// number (same seed every time), so it can be reused both by
+  /// [initState] and by [_restartLevel] to restore the exact same start —
+  /// never a fresh/different scramble.
+  void _setupLevel() {
     _size = _level <= 5
         ? 3
         : _level <= 10
         ? 4
         : 5;
     _grid = List.generate(_size, (_) => List.filled(_size, false));
+    _moves = 0;
     final scramble = 4 + _level; // deeper scramble at higher levels
     final rng = Random(1000 + _level); // deterministic per level
     for (var i = 0; i < scramble; i++) {
@@ -59,6 +69,14 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
     if (_isSolved()) {
       _toggle(0, 0, countMove: false);
     }
+  }
+
+  /// Same-level restart: re-derives this level's starting grid in place,
+  /// without leaving the screen or touching progress. Distinct from
+  /// `gameActions()`'s own "Reset progress" action (wipes all levels).
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_setupLevel);
   }
 
   void _toggle(int r, int c, {bool countMove = true}) {
@@ -182,6 +200,7 @@ class _LightsOutScreenState extends State<LightsOutScreen> {
             def: lightsOutDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
         ],
       ),

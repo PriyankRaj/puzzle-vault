@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 import '../../core/widgets/swipe_area.dart';
 
@@ -140,6 +141,16 @@ class GameObject {
 /// `#` wall   `B` box   `R` rock   `F` flag   `P` player (noun objects)
 /// `w b r g` word-tiles WALL/BOX/ROCK/FLAG   `i` word IS
 /// `s u n`  word-tiles STOP/PUSH/WIN
+// Ordering deliberately front-loads mechanic *introductions* (WIN-walk,
+// STOP-break, PUSH) within the first half instead of spending 3-4 levels
+// per mechanic before moving on, then spends the second half stacking
+// reassembly + decorative decoys + a genuine two-mechanic combo before the
+// largest board as a capstone — the original ordering introduced one new
+// idea roughly every 2 levels and never combined two required mechanics
+// until level 14, which read as flat. Levels 1 and 4 are hard-coded against
+// in test/games/rule_breaker_logic_test.dart (exact tap sequences) and must
+// keep this exact content; every other layout is unchanged content from
+// the original 15, just resequenced.
 const List<List<String>> _levels = [
   // 1: walk straight onto a flag that is already WIN.
   ['.....', '.P...', '.....', '.gin.', '..F..'],
@@ -149,25 +160,30 @@ const List<List<String>> _levels = [
   ['......', '..P...', '......', '......', '.gin..', '...F..'],
   // 4: WALL IS STOP blocks the direct route; push WALL out of line to break it.
   ['P.#.F', '.wis.', '.....', '.gin.'],
-  // 5: same idea with a dedicated alcove to push the word tile into.
-  ['P..#.F', 'X.wisX', 'X....X', 'XginXX'],
-  // 6: ROCK IS STOP variant, bigger grid.
-  ['P..R.F', '......', '.ris..', '......', '.gin..'],
-  // 7: WALL IS STOP again, largest of this band.
-  ['P...#.F', '.......', '..wis..', '.......', '..gin..', '.......'],
-  // 8: BOX IS PUSH introduced (box is not blocking the only route here).
+  // 5: BOX IS PUSH introduced already (was level 8) — second mechanic
+  // appears right after the first, instead of three levels later.
   ['P.B.F', '.....', '.biu.', '.gin.'],
-  // 9: ROCK IS PUSH variant.
+  // 6: WALL IS STOP alcove variant (was level 5), a second STOP-break.
+  ['P..#.F', 'X.wisX', 'X....X', 'XginXX'],
+  // 7: ROCK IS STOP variant (was level 6).
+  ['P..R.F', '......', '.ris..', '......', '.gin..'],
+  // 8: ROCK IS PUSH variant (was level 9) — by here both STOP and PUSH have
+  // each been seen twice, in half the levels the original took.
   ['P..R.F', '......', '.riu..', '......', '.gin..'],
-  // 10: BOX IS PUSH, bigger grid.
+  // 9: WALL IS STOP again, largest of that band (was level 7).
+  ['P...#.F', '.......', '..wis..', '.......', '..gin..', '.......'],
+  // 10: BOX IS PUSH, bigger grid (was level 10).
   ['P.B..F', '......', '.biu..', '......', '.gin..'],
-  // 11: BOX IS PUSH, largest of this band.
-  ['P...B.F', '.......', '..biu..', '.......', '..gin..', '.......'],
-  // 12: FLAG IS WIN is *broken* by a gap; push WIN tile into place to form it.
+  // 11: FLAG IS WIN is *broken* by a gap; push WIN tile into place to form
+  // it — reassembly introduced (was level 12).
   ['P......', '.......', '.gi.n.F', '.......', '..biu..', '.......'],
-  // 13: same trick with ROCK IS WIN, plus a decorative unused rule.
+  // 12: BOX IS PUSH, largest of that band (was level 11).
+  ['P...B.F', '.......', '..biu..', '.......', '..gin..', '.......'],
+  // 13: same reassembly trick with ROCK IS WIN, plus a decorative unused
+  // rule (was level 13).
   ['P......', '.......', '.ri.n.R', '.......', '..wis..', '.......', '.......'],
-  // 14: combine WALL IS STOP (must break) with a pre-set FLAG IS WIN.
+  // 14: combine WALL IS STOP (must break) with a pre-set FLAG IS WIN — the
+  // one level requiring two mechanics at once, right before the capstone.
   ['P...#.F', '.......', '..wis..', '.......', '..gin..', '.......', '.biu...'],
   // 15: largest board, combine a WIN tile that must be assembled with two
   // decorative rules already active elsewhere.
@@ -208,6 +224,14 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
   @override
   void initState() {
     super.initState();
+    _loadLevel();
+  }
+
+  /// Parses the current level's ASCII layout into fresh [_objects] and
+  /// resets all mutable play state. Called from [initState] and again from
+  /// [_restartLevel] so a same-level restart re-lays-out the level exactly
+  /// as it started, instead of duplicating this parsing logic.
+  void _loadLevel() {
     final rows = _levels[_level - 1];
     _height = rows.length;
     _width = rows[0].length;
@@ -233,6 +257,14 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
     _won = false;
     _history.clear();
     _rescanRules();
+  }
+
+  /// Resets the current level attempt back to its just-started layout —
+  /// distinct from [_undo] (steps back one move) and from "Give up"
+  /// (`widget.ctx.onExit()`, leaves the screen entirely).
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_loadLevel);
   }
 
   GameObject? _at(int r, int c, {GameObject? exclude}) {
@@ -475,7 +507,7 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w800,
-                fontSize: 12,
+                fontSize: 14,
                 color: AppTheme.textPrimary,
                 letterSpacing: 0.5,
               ),
@@ -539,10 +571,12 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
             def: ruleBreakerDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -551,11 +585,13 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Moves: $_moves',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Moves: $_moves',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: _history.isEmpty ? null : _undo,
@@ -577,7 +613,7 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
                           'No active rules',
                           style: TextStyle(
                             color: AppTheme.textSecondary,
-                            fontSize: 12,
+                            fontSize: 13,
                           ),
                         ),
                       ),
@@ -590,7 +626,7 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
                             label: Text(
                               label,
                               style: const TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -658,7 +694,7 @@ class _RuleBreakerScreenState extends State<RuleBreakerScreen> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(
               'Push word-tiles to form NOUN IS PROPERTY rules, then reach a WIN tile',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),

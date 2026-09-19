@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original lateral-thinking puzzle set. Each level shows one short,
@@ -118,12 +119,29 @@ class TrickLogicScreen extends StatefulWidget {
 class _TrickLogicScreenState extends State<TrickLogicScreen> {
   bool _solved = false;
 
+  /// Bumped by [_restartLevel] and used as the level widget's key, so
+  /// giving up mid-level (a checked box, a half-typed answer, a partial
+  /// tap sequence) throws away that per-level widget's `State` and
+  /// remounts it fresh, instead of merely resetting this screen's own
+  /// `_solved` flag.
+  int _attempt = 0;
+
   int get _level => widget.ctx.level;
 
   void _onSolved() {
     if (_solved) return;
     _solved = true;
     widget.ctx.onComplete(stars: 3);
+  }
+
+  /// Same-level restart reachable at any time from the AppBar — does not
+  /// touch `widget.ctx` and shows no dialog, distinct from "Give up".
+  void _restartLevel() {
+    Sfx.tap();
+    setState(() {
+      _solved = false;
+      _attempt++;
+    });
   }
 
   void _showHint() {
@@ -180,17 +198,22 @@ class _TrickLogicScreenState extends State<TrickLogicScreen> {
             def: trickLogicDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
+            tooltip: 'Give up',
+            icon: const Icon(Icons.flag_outlined),
           ),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: _buildLevel(context),
+          child: KeyedSubtree(
+            key: ValueKey(_attempt),
+            child: _buildLevel(context),
+          ),
         ),
       ),
     );

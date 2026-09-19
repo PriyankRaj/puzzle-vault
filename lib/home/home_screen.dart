@@ -60,7 +60,7 @@ class HomeScreen extends StatelessWidget {
                     // Also grows taller under larger system text sizes.
                     childAspectRatio: textScaleAdjustedAspectRatio(
                       context,
-                      0.78,
+                      0.74,
                     ),
                   ),
                   itemBuilder: (context, index) =>
@@ -145,7 +145,7 @@ class _GameCardState extends State<_GameCard> {
                     def.title,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontSize: 17,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -154,7 +154,7 @@ class _GameCardState extends State<_GameCard> {
                   Text(
                     def.tagline,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: AppTheme.textSecondary,
                     ),
                     maxLines: 2,
@@ -214,12 +214,12 @@ class _ProgressBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const height = 16.0;
+    const height = 18.0;
     final progress = this.progress;
     if (progress == null) return const SizedBox(height: height);
 
     final textStyle = TextStyle(
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: FontWeight.w600,
       color: AppTheme.textSecondary,
     );
@@ -228,7 +228,7 @@ class _ProgressBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(progress.icon, size: 13, color: AppTheme.warning),
+          Icon(progress.icon, size: 14, color: AppTheme.warning),
           const SizedBox(width: 4),
           Text(progress.display, style: textStyle),
         ],

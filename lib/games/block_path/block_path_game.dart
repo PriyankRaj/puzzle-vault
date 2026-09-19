@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original puzzle: an isometric-look terrain of raised/lowered "blocks".
@@ -505,6 +506,7 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
   }
 
   void _restart() {
+    Sfx.tap();
     _flashTimer?.cancel();
     setState(() {
       _current = _spec.start;
@@ -584,15 +586,18 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
     final naturalSize = _boardSize(1.0);
     return Scaffold(
       appBar: AppBar(
-        title: Text('Block Path · Level $_level'),
+        title: Text(
+          'Block Path · Level $_level',
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           ...gameActions(
             context: context,
             def: blockPathDefinition,
             ctx: widget.ctx,
             onHint: _finished ? null : _showHint,
+            onRestart: _restart,
           ),
-          TextButton(onPressed: _restart, child: const Text('Restart')),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
       ),
@@ -601,21 +606,28 @@ class _BlockPathScreenState extends State<BlockPathScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Steps: $_steps',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Steps: $_steps',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                Text(
-                  _finished
-                      ? 'Goal reached!'
-                      : 'Reach the highlighted goal block',
-                  style: TextStyle(
-                    color: _finished
-                        ? AppTheme.success
-                        : AppTheme.textSecondary,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _finished
+                        ? 'Goal reached!'
+                        : 'Reach the highlighted goal block',
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _finished
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

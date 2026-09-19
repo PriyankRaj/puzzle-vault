@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: classic 9x9 Sudoku (public domain mechanic).
@@ -54,6 +55,14 @@ class _SudokuScreenState extends State<SudokuScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  /// Builds this level's puzzle from its deterministic seed (`2000 +
+  /// _level`, so the same level always produces the same puzzle) and resets
+  /// all mutable play state — shared by [initState] and [_restartLevel] so
+  /// a restart re-deals the exact same puzzle instead of a new random one.
+  void _setupLevel() {
     final rng = Random(2000 + _level);
     _solution = _generateSolved(rng);
     final blanks = (30 + ((_level - 1) * 25 / 14)).round().clamp(30, 55);
@@ -66,6 +75,18 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _board[r][c] = 0;
       _given[r][c] = false;
     }
+    _selectedRow = null;
+    _selectedCol = null;
+    _mistakes = 0;
+    _finished = false;
+  }
+
+  /// Same-level do-over: re-deals this level's puzzle in place, distinct
+  /// from "Reset progress" (which wipes unlocked levels/stars for every
+  /// level in this game). Never leaves the screen, never shows a dialog.
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_setupLevel);
   }
 
   /// Builds a full, valid solved 9x9 grid using the well-known base pattern
@@ -216,10 +237,12 @@ class _SudokuScreenState extends State<SudokuScreen> {
             def: sudokuDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),

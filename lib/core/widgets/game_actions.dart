@@ -14,16 +14,23 @@ import 'info_tip_button.dart';
 /// finders like `tactics_grid_logic_test.dart`'s
 /// `_cellGestureDetectorOffset`).
 ///
-/// Order: Hint (only if the game supplies one), How to play, Levels (only
-/// for [GameMode.levels] games — opens the picker without leaving the
-/// screen), Reset progress.
+/// Order: Restart level (only if the game supplies one), Hint (only if the
+/// game supplies one), How to play, Levels (only for [GameMode.levels]
+/// games — opens the picker without leaving the screen), Reset progress.
 List<Widget> gameActions({
   required BuildContext context,
   required GameDefinition def,
   required GameLevelContext ctx,
   VoidCallback? onHint,
+  VoidCallback? onRestart,
 }) {
   return [
+    if (onRestart != null)
+      IconButton(
+        icon: const Icon(Icons.replay_rounded),
+        tooltip: 'Restart level',
+        onPressed: onRestart,
+      ),
     if (onHint != null)
       IconButton(
         icon: const Icon(Icons.lightbulb_outline_rounded),

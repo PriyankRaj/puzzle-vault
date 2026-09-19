@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: an original solo rule-manual deduction puzzle.
@@ -211,6 +212,15 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
   void _resetLevel() {
     _timer?.cancel();
     setState(_loadLevel);
+  }
+
+  /// Same-level restart reachable at any time from the AppBar, distinct
+  /// from [_resetLevel]'s use as the failed-attempt Retry action: this one
+  /// gives its own tap feedback since it's a direct user action, not a
+  /// dialog button.
+  void _restartLevel() {
+    Sfx.tap();
+    _resetLevel();
   }
 
   // ---- Level generation ------------------------------------------------
@@ -542,6 +552,7 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
             def: defuseProtocolDefinition,
             ctx: widget.ctx,
             onHint: isComplete ? null : _showHint,
+            onRestart: _restartLevel,
           ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
@@ -683,7 +694,7 @@ class _DefuseProtocolScreenState extends State<DefuseProtocolScreen> {
                     Text(
                       _wireColorName(module.colors[i]),
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 13,
                         color: AppTheme.textSecondary,
                       ),
                     ),

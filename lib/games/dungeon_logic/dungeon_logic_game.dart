@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 import '../../core/widgets/swipe_area.dart';
 
@@ -448,6 +449,10 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  void _setupLevel() {
     final grid = _def.grid;
     _height = grid.length;
     _width = grid[0].length;
@@ -468,6 +473,14 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
     _inventory.clear();
     _moves = 0;
     _won = false;
+  }
+
+  /// Same-level restart reachable at any time via the shared "Restart
+  /// level" action, distinct from "Give up" (leaves the screen) and "Reset
+  /// progress" (wipes all unlocked levels/stars for this game).
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_setupLevel);
   }
 
   bool _isDigit(String ch) =>
@@ -751,10 +764,12 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             def: dungeonLogicDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.flag_rounded),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -763,36 +778,46 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Moves: $_moves',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Moves: $_moves',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
-                Row(
-                  children: [
-                    for (final color in ['R', 'B', 'G'])
-                      if (_inventory.contains(color))
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: _keyColors[color],
-                              shape: BoxShape.circle,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final color in ['R', 'B', 'G'])
+                          if (_inventory.contains(color))
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: _keyColors[color],
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        if (_inventory.isEmpty)
+                          Text(
+                            'No keys held',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 13,
                             ),
                           ),
-                        ),
-                    if (_inventory.isEmpty)
-                      Text(
-                        'No keys held',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -860,7 +885,7 @@ class _DungeonLogicScreenState extends State<DungeonLogicScreen> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(
               'Collect keys to open matching doors, flip switches to open gates, reach the exit',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),

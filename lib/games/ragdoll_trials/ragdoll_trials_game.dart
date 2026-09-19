@@ -8,6 +8,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 import '../../core/widgets/swipe_area.dart';
 
@@ -81,47 +82,76 @@ class _LevelSpec {
 
 /// 15 hand-designed levels. Difficulty grows via longer courses, narrower
 /// platforms, more gaps, extra vertical tiers and (from level 6 on) a
-/// single spinning hazard to time around. Every gap is sized well below
-/// the width of the runway platform preceding it, so a blob that has built
-/// up horizontal speed while pushed along that runway carries enough
-/// momentum past the ledge to still be within the next platform's x-range
-/// by the time it sinks back down to that platform's top surface — the
-/// same "runway then momentum carry" shape used for every gap below.
-/// Multi-tier levels always drop onto a generously wide lower platform, so
-/// horizontal drift only needs to be roughly right, not pixel-perfect.
+/// single spinning hazard to time around. Every floor gap is 18px — well
+/// under one blob diameter (28px) — so a blob that has built up horizontal
+/// speed while pushed along the runway preceding it clears the gap before
+/// sinking more than a fraction of a blob radius below the next platform's
+/// top surface. That margin matters: `_resolveRect` correctly treats a
+/// falling body that has already sunk past a platform's top surface before
+/// reaching that platform's x-range as a *side* hit (zeroing all
+/// horizontal velocity, as a solid rectangle should), so a wider gap lets
+/// the blob clip the next platform's corner and drop straight into the pit
+/// beside it instead of landing on top — see the level-3 comment below for
+/// the bug this used to cause. Multi-tier levels always drop onto a
+/// generously wide lower platform, so horizontal drift only needs to be
+/// roughly right, not pixel-perfect.
 final List<_LevelSpec> _levels = [
   // Level 1 — full-width floor, no obstacles. Warm-up: fall, push right.
+  // Starts just above the floor (not high above the canvas) — see the
+  // fixed-bug note below.
   const _LevelSpec(
-    start: Offset(60, 60),
+    start: Offset(60, 520),
     platforms: [Rect.fromLTWH(0, 560, 400, 40)],
     goal: Rect.fromLTWH(300, 515, 70, 45),
   ),
   // Level 2 — mirror of level 1: push left instead.
   const _LevelSpec(
-    start: Offset(340, 60),
+    start: Offset(340, 520),
     platforms: [Rect.fromLTWH(0, 560, 400, 40)],
     goal: Rect.fromLTWH(30, 515, 70, 45),
   ),
-  // Level 3 — one 50px gap (x175-225) in the floor. The 175px-wide runway
+  // Level 3 — one 18px gap (x175-193) in the floor. The 175px-wide runway
   // (platform A) is ample room to build rightward speed before the ledge.
+  //
+  // BUGFIX (previously "not working"): every gapped floor level used to
+  // `start` at y=60 while every platform sits at y=560 — a 500px freefall
+  // with no platform underneath, unlike every multi-tier level (5/8/10/13/
+  // 15), which correctly starts ~40px above its first platform. During
+  // that 500px fall the push accelerated the blob to full horizontal speed
+  // and it drifted ~170px sideways before ever touching anything, landing
+  // it randomly mid-course instead of on platform A — bypassing the
+  // intended "build speed along the runway" mechanic entirely and often
+  // dropping it straight into a gap on first contact.
+  //
+  // Separately, even from a correct start, the original 35-50px gaps left
+  // almost no margin: `_resolveRect` (correctly, for a solid rectangle)
+  // treats a falling body that has sunk even slightly below a platform's
+  // top surface before reaching that platform's x-range as a *side* hit,
+  // zeroing all horizontal velocity — so a blob crossing a gap that wide
+  // reliably clips the next platform's corner and drops straight into the
+  // pit beside it instead of landing on top, confirmed by replaying the
+  // real physics constants frame-by-frame. Gaps below are narrowed to 18px
+  // (well under one blob diameter), which keeps the sink at the moment of
+  // arrival comfortably under one blob radius, so the intended "runway
+  // speed carries it across" behavior actually holds.
   const _LevelSpec(
-    start: Offset(50, 60),
+    start: Offset(50, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 175, 40),
-      Rect.fromLTWH(225, 560, 175, 40),
+      Rect.fromLTWH(193, 560, 175, 40),
     ],
-    goal: Rect.fromLTWH(300, 515, 70, 45),
+    goal: Rect.fromLTWH(268, 515, 70, 45),
   ),
-  // Level 4 — two 40px gaps, three platforms (130 / 130 / 60 wide). Each
+  // Level 4 — two 18px gaps, three platforms (130 / 130 / 60 wide). Each
   // runway is still wide enough to accelerate before its gap.
   const _LevelSpec(
-    start: Offset(40, 60),
+    start: Offset(40, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 130, 40),
-      Rect.fromLTWH(170, 560, 130, 40),
-      Rect.fromLTWH(340, 560, 60, 40),
+      Rect.fromLTWH(148, 560, 130, 40),
+      Rect.fromLTWH(296, 560, 60, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 50, 45),
+    goal: Rect.fromLTWH(301, 515, 50, 45),
   ),
   // Level 5 — first vertical drop: a mid-height ledge (x0-160) over a
   // full-width floor safety net. Whatever speed the blob carries off the
@@ -132,36 +162,36 @@ final List<_LevelSpec> _levels = [
     platforms: [Rect.fromLTWH(0, 380, 160, 24), Rect.fromLTWH(0, 560, 400, 40)],
     goal: Rect.fromLTWH(300, 515, 70, 45),
   ),
-  // Level 6 — two floor gaps (40px, 30px) plus the first hazard: a spinning
-  // 60-long arm pivoting near the second gap at path height, forcing a
-  // timed pass rather than a blind run.
+  // Level 6 — two floor gaps (18px each, see the level-3 bugfix note above)
+  // plus the first hazard: a spinning 60-long arm pivoting near the second
+  // gap at path height, forcing a timed pass rather than a blind run.
   const _LevelSpec(
-    start: Offset(40, 60),
+    start: Offset(40, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 140, 40),
-      Rect.fromLTWH(180, 560, 140, 40),
-      Rect.fromLTWH(350, 560, 50, 40),
+      Rect.fromLTWH(158, 560, 140, 40),
+      Rect.fromLTWH(316, 560, 50, 40),
     ],
-    goal: Rect.fromLTWH(355, 515, 40, 45),
+    goal: Rect.fromLTWH(321, 515, 40, 45),
     hazard: _Hazard(
-      pivot: Offset(330, 530),
+      pivot: Offset(296, 530),
       length: 60,
       thickness: 8,
       angularSpeed: 2.5,
     ),
   ),
-  // Level 7 — three narrower 35px gaps, four platforms (90/70/70/65 wide).
-  // No hazard: pure precision level, each runway still comfortably wider
-  // than the gap that follows it.
+  // Level 7 — three narrower 18px gaps (see the level-3 bugfix note above),
+  // four platforms (90/70/70/65 wide). No hazard: pure precision level,
+  // each runway still comfortably wider than the gap that follows it.
   const _LevelSpec(
-    start: Offset(40, 60),
+    start: Offset(40, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 90, 40),
-      Rect.fromLTWH(125, 560, 70, 40),
-      Rect.fromLTWH(230, 560, 70, 40),
-      Rect.fromLTWH(335, 560, 65, 40),
+      Rect.fromLTWH(108, 560, 70, 40),
+      Rect.fromLTWH(196, 560, 70, 40),
+      Rect.fromLTWH(284, 560, 65, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 45, 45),
+    goal: Rect.fromLTWH(294, 515, 45, 45),
   ),
   // Level 8 — two-tier level: a mid tier with one 50px gap (140 / 150 wide
   // runways), dropping onto a full-width floor safety net. A hazard swings
@@ -184,16 +214,16 @@ final List<_LevelSpec> _levels = [
   // Level 9 — same three-gap floor shape as level 7, with a hazard added
   // over the middle gap for a timing gate mid-course.
   const _LevelSpec(
-    start: Offset(40, 60),
+    start: Offset(40, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 90, 40),
-      Rect.fromLTWH(125, 560, 70, 40),
-      Rect.fromLTWH(230, 560, 70, 40),
-      Rect.fromLTWH(335, 560, 65, 40),
+      Rect.fromLTWH(108, 560, 70, 40),
+      Rect.fromLTWH(196, 560, 70, 40),
+      Rect.fromLTWH(284, 560, 65, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 45, 45),
+    goal: Rect.fromLTWH(294, 515, 45, 45),
     hazard: _Hazard(
-      pivot: Offset(210, 530),
+      pivot: Offset(176, 530),
       length: 55,
       thickness: 8,
       angularSpeed: 2.6,
@@ -218,33 +248,33 @@ final List<_LevelSpec> _levels = [
       angularSpeed: 2.3,
     ),
   ),
-  // Level 11 — four tight 35px gaps, five ~50-60px platforms. No hazard:
-  // the tightest pure-precision floor course. Each runway is still ~15-25px
-  // wider than the gap it precedes.
+  // Level 11 — four tight 18px gaps (see the level-3 bugfix note above),
+  // five ~50-60px platforms. No hazard: the tightest pure-precision floor
+  // course.
   const _LevelSpec(
-    start: Offset(25, 60),
+    start: Offset(25, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 50, 40),
-      Rect.fromLTWH(85, 560, 50, 40),
-      Rect.fromLTWH(170, 560, 50, 40),
-      Rect.fromLTWH(255, 560, 50, 40),
-      Rect.fromLTWH(340, 560, 60, 40),
+      Rect.fromLTWH(68, 560, 50, 40),
+      Rect.fromLTWH(136, 560, 50, 40),
+      Rect.fromLTWH(204, 560, 50, 40),
+      Rect.fromLTWH(272, 560, 60, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 45, 45),
+    goal: Rect.fromLTWH(277, 515, 45, 45),
   ),
   // Level 12 — same three-gap course as level 7/9, with a hazard gating the
   // very last approach onto the goal platform.
   const _LevelSpec(
-    start: Offset(40, 60),
+    start: Offset(40, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 90, 40),
-      Rect.fromLTWH(125, 560, 70, 40),
-      Rect.fromLTWH(230, 560, 70, 40),
-      Rect.fromLTWH(335, 560, 65, 40),
+      Rect.fromLTWH(108, 560, 70, 40),
+      Rect.fromLTWH(196, 560, 70, 40),
+      Rect.fromLTWH(284, 560, 65, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 45, 45),
+    goal: Rect.fromLTWH(294, 515, 45, 45),
     hazard: _Hazard(
-      pivot: Offset(365, 530),
+      pivot: Offset(314, 530),
       length: 50,
       thickness: 8,
       angularSpeed: 3.0,
@@ -276,17 +306,17 @@ final List<_LevelSpec> _levels = [
   // Level 14 — the level-11 four-gap floor course, with a hazard added
   // over the second gap.
   const _LevelSpec(
-    start: Offset(25, 60),
+    start: Offset(25, 520),
     platforms: [
       Rect.fromLTWH(0, 560, 50, 40),
-      Rect.fromLTWH(85, 560, 50, 40),
-      Rect.fromLTWH(170, 560, 50, 40),
-      Rect.fromLTWH(255, 560, 50, 40),
-      Rect.fromLTWH(340, 560, 60, 40),
+      Rect.fromLTWH(68, 560, 50, 40),
+      Rect.fromLTWH(136, 560, 50, 40),
+      Rect.fromLTWH(204, 560, 50, 40),
+      Rect.fromLTWH(272, 560, 60, 40),
     ],
-    goal: Rect.fromLTWH(345, 515, 45, 45),
+    goal: Rect.fromLTWH(277, 515, 45, 45),
     hazard: _Hazard(
-      pivot: Offset(150, 530),
+      pivot: Offset(116, 530),
       length: 55,
       thickness: 8,
       angularSpeed: 2.8,
@@ -569,6 +599,30 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
     _ticker = createTicker(_onTick)..start();
   }
 
+  /// Manual same-level restart, reachable at any time (not just after a
+  /// fall) via the shared "Restart level" action. Mirrors [_retry]'s state
+  /// reset but also counts as a fall so a player can't dodge star grading
+  /// by restarting instead of letting an actual fall be recorded.
+  void _restartLevel() {
+    if (!mounted) return;
+    Sfx.tap();
+    setState(() {
+      _failCount++;
+      _pos = _spec.start;
+      _vel = Offset.zero;
+      _visualRotation = 0;
+      _settleCounter = 0;
+      _failed = false;
+      _completed = false;
+      _pushLeftHeld = false;
+      _pushRightHeld = false;
+    });
+    _lastElapsed = Duration.zero;
+    _ticker?.stop();
+    _ticker?.dispose();
+    _ticker = createTicker(_onTick)..start();
+  }
+
   void _setPushLeft(bool held) {
     if (!mounted) return;
     setState(() => _pushLeftHeld = held);
@@ -644,10 +698,12 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
             def: ragdollTrialsDefinition,
             ctx: widget.ctx,
             onHint: (_failed || _completed) ? null : _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.exit_to_app_rounded),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -656,24 +712,33 @@ class _RagdollTrialsScreenState extends State<RagdollTrialsScreen>
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Falls this attempt: $_failCount',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Falls this attempt: $_failCount',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                Text(
-                  _completed
-                      ? 'Settled!'
-                      : (_failed ? 'Failed' : 'Push toward the goal'),
-                  style: TextStyle(
-                    color: _completed
-                        ? AppTheme.success
-                        : (_failed ? AppTheme.danger : AppTheme.textSecondary),
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _completed
+                        ? 'Settled!'
+                        : (_failed ? 'Failed' : 'Push toward the goal'),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _completed
+                          ? AppTheme.success
+                          : (_failed
+                                ? AppTheme.danger
+                                : AppTheme.textSecondary),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],

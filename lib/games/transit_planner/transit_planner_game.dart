@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Reference implementation: an original network-design strategy game,
@@ -26,11 +27,15 @@ final GameDefinition transitPlannerDefinition = GameDefinition(
   mode: GameMode.levels,
   levelCount: 15,
   helpText:
-      'Pick a line above, then drag from station to station to extend it. '
+      'Pick a line above, then drag from station to station to extend it — '
+      'you can only connect stations that are joined by the faint track on '
+      'the map, and a line can\'t cross itself by revisiting a station. '
       'Every station must be touched by some line, and any stations that '
       'share the same shape must be reachable from one another by walking '
-      'along your drawn lines. Solve it using as few lines as possible for '
-      'more stars.',
+      'along your drawn lines, switching lines wherever two of them share a '
+      'station. Some stations only branch off a single junction — you\'ll '
+      'need a separate line to reach them. Solve it using as few lines as '
+      'possible for more stars.',
   builder: (context, ctx) => TransitPlannerScreen(ctx: ctx),
 );
 
@@ -59,22 +64,37 @@ class _Station {
   final int shapeType;
 }
 
-/// One hand-authored level: a fixed station layout and the number of line
-/// slots the player is given to solve it.
+/// One hand-authored level: a fixed station layout, the legal track
+/// connections between them ([edges] — a line can only extend between two
+/// stations that appear together in one of these pairs), and the number of
+/// line slots the player is given to solve it.
 ///
-/// Solvability proof used for every level below: the stations in each
-/// level are listed in walking order around a loop (station i is
-/// geometrically adjacent to station i+1). A single line drawn as
-/// 0 -> 1 -> 2 -> ... -> (n-1) touches every station and puts every
-/// station in one connected component, so it trivially satisfies both win
-/// conditions (full coverage, and every same-type pair mutually
-/// reachable) while using only 1 of the available line slots. That is
-/// verified per-level in the comment above each entry, together with the
-/// station-type breakdown that makes the connectivity requirement real
-/// (any type that appears 2+ times must all end up in one component).
+/// Base solvability proof (levels with no spurs, [edges] = consecutive ring
+/// pairs only): the stations are listed in walking order around a loop
+/// (station i is geometrically adjacent to station i+1, and that adjacency
+/// is always a legal edge). A single line drawn as 0 -> 1 -> 2 -> ... ->
+/// (n-1) touches every station and puts every station in one connected
+/// component, so it trivially satisfies both win conditions while using
+/// only 1 of the available line slots.
+///
+/// Once a level adds spurs (see [_withSpurs]), that spine no longer reaches
+/// everything: each spur station's only edge is to its hub, and a line
+/// can't revisit a station to detour out to a spur and back, so the spine
+/// line must skip it. Reaching a spur costs a separate line slot (or a line
+/// shared with another spur via a path through the ring that doesn't
+/// revisit anything) — [_withSpurs] always grants exactly
+/// `1 + spurCount` line slots, which covers the guaranteed "one line per
+/// spur, plus the spine" solution regardless of how the player routes,
+/// while a cleverer combined routing that uses half or fewer of those
+/// slots earns full stars (see `_afterEdit`'s star threshold).
 class _LevelData {
-  const _LevelData({required this.stations, required this.maxLines});
+  const _LevelData({
+    required this.stations,
+    required this.edges,
+    required this.maxLines,
+  });
   final List<_Station> stations;
+  final List<List<int>> edges;
   final int maxLines;
 }
 
@@ -184,67 +204,110 @@ List<_Station> _ring(List<Offset> positions, int phase) => [
     _Station(positions[i], (i + phase) % 3),
 ];
 
-final List<_LevelData> _levels = [
-  // Level 1: 5 stations - circles {0,3}, triangles {1,4}, square {2}.
-  // Spine 0-1-2-3-4 touches all 5 and connects both repeated types using
-  // just 1 of 2 available lines.
-  _LevelData(stations: _ring(_ring5, 0), maxLines: 2),
+/// Legal track connections for a plain ring: only consecutive stations in
+/// walking order (0-1, 1-2, ..., (n-2)-(n-1)) — exactly what the spine
+/// solution needs, and nothing that would let a line shortcut across the
+/// ring.
+List<List<int>> _ringEdges(int n) => [
+  for (var i = 0; i < n - 1; i++) [i, i + 1],
+];
 
-  // Level 2: 5 stations - triangles {0,3}, squares {1,4}, circle {2}.
-  // Spine 0-1-2-3-4 solves it with 1 of 2 lines.
-  _LevelData(stations: _ring(_ring5, 1), maxLines: 2),
+/// Places one spur station just outside the ring, radiating straight out
+/// from its hub station through the board center — far enough past the
+/// ring radius (~0.35) to read as a distinct branch, not another ring stop.
+_Station _spurStation(Offset hubPos, int shapeType) {
+  const center = Offset(0.5, 0.5);
+  final dir = hubPos - center;
+  final unit = dir.distance == 0 ? const Offset(0, -1) : dir / dir.distance;
+  return _Station(center + unit * 0.47, shapeType);
+}
+
+/// Builds a ring level and grafts [spurCount] single-station branches onto
+/// it, each hanging off its own hub station spaced evenly around the ring.
+/// A spur's only edge is to its hub, so — since a line can never revisit a
+/// station (see `_onPanUpdate`) — the spine that solves the plain ring
+/// can't detour out to a spur and back; reaching it costs a dedicated line.
+/// Every spur reuses the ring's 3-type cycle (offset by one from its hub),
+/// so its type always already repeats elsewhere on the board, which is
+/// what makes the "same-type stations share one component" win condition
+/// actually bite once spurs exist — see the class doc on [_LevelData].
+_LevelData _withSpurs(List<Offset> ringPositions, int phase, int spurCount) {
+  final ringStations = _ring(ringPositions, phase);
+  final n = ringStations.length;
+  final stations = [...ringStations];
+  final edges = _ringEdges(n);
+  for (var k = 0; k < spurCount; k++) {
+    final hub = (k * n) ~/ spurCount;
+    final spurType = (ringStations[hub].shapeType + 1) % 3;
+    final spurIndex = stations.length;
+    stations.add(_spurStation(ringStations[hub].pos, spurType));
+    edges.add([hub, spurIndex]);
+  }
+  return _LevelData(
+    stations: stations,
+    edges: edges,
+    maxLines: 1 + spurCount,
+  );
+}
+
+final List<_LevelData> _levels = [
+  // Level 1: 5 stations - circles {0,3}, triangles {1,4}, square {2}. Plain
+  // ring, no spurs. Spine 0-1-2-3-4 touches all 5 and connects both
+  // repeated types using just 1 of 2 available lines.
+  _LevelData(stations: _ring(_ring5, 0), edges: _ringEdges(5), maxLines: 2),
+
+  // Level 2: 5 stations - triangles {0,3}, squares {1,4}, circle {2}. Plain
+  // ring. Spine 0-1-2-3-4 solves it with 1 of 2 lines.
+  _LevelData(stations: _ring(_ring5, 1), edges: _ringEdges(5), maxLines: 2),
 
   // Level 3: 6 stations - circles {0,3}, triangles {1,4}, squares {2,5}.
-  // Spine 0-1-2-3-4-5 solves it with 1 of 2 lines.
-  _LevelData(stations: _ring(_ring6, 0), maxLines: 2),
+  // Plain ring, last one before spurs start. Spine 0-1-2-3-4-5 solves it
+  // with 1 of 2 lines.
+  _LevelData(stations: _ring(_ring6, 0), edges: _ringEdges(6), maxLines: 2),
 
-  // Level 4: 6 stations - triangles {0,3}, squares {1,4}, circles {2,5}.
-  // Spine 0-1-2-3-4-5 solves it with 1 of 3 lines.
-  _LevelData(stations: _ring(_ring6, 1), maxLines: 3),
+  // Level 4: ring6, phase 1, +1 spur off hub station 0. Needs the spine
+  // (1 line) plus one dedicated line out to the spur; solvable with 2 of
+  // the 2 line slots — no slack for combining, so this is a 2-star intro
+  // to the spur mechanic.
+  _withSpurs(_ring6, 1, 1),
 
-  // Level 5: 7 stations - circles {0,3,6}, triangles {1,4}, squares {2,5}.
-  // Spine 0..6 solves it with 1 of 3 lines.
-  _LevelData(stations: _ring(_ring7, 0), maxLines: 3),
+  // Level 5: ring7, phase 0, +1 spur. Same shape as level 4, one ring size
+  // bigger.
+  _withSpurs(_ring7, 0, 1),
 
-  // Level 6: 7 stations - triangles {0,3,6}, squares {1,4}, circles {2,5}.
-  // Spine 0..6 solves it with 1 of 3 lines.
-  _LevelData(stations: _ring(_ring7, 1), maxLines: 3),
+  // Level 6: ring7, phase 1, +2 spurs on opposite sides of the ring —
+  // first level where combining two spur-runs into one line (routing
+  // hub-to-hub along an unused stretch of ring track) actually pays off
+  // for the 3-star threshold.
+  _withSpurs(_ring7, 1, 2),
 
-  // Level 7: 8 stations - circles {0,3,6}, triangles {1,4,7}, squares {2,5}.
-  // Spine 0..7 solves it with 1 of 3 lines.
-  _LevelData(stations: _ring(_ring8, 0), maxLines: 3),
+  // Level 7: ring8, phase 0, +2 spurs.
+  _withSpurs(_ring8, 0, 2),
 
-  // Level 8: 8 stations - triangles {0,3,6}, squares {1,4,7}, circles {2,5}.
-  // Spine 0..7 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring8, 1), maxLines: 4),
+  // Level 8: ring8, phase 1, +3 spurs.
+  _withSpurs(_ring8, 1, 3),
 
-  // Level 9: 9 stations - circles {0,3,6}, triangles {1,4,7}, squares {2,5,8}.
-  // Spine 0..8 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring9, 0), maxLines: 4),
+  // Level 9: ring9, phase 0, +3 spurs.
+  _withSpurs(_ring9, 0, 3),
 
-  // Level 10: 9 stations - triangles {0,3,6}, squares {1,4,7}, circles {2,5,8}.
-  // Spine 0..8 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring9, 1), maxLines: 4),
+  // Level 10: ring9, phase 1, +4 spurs.
+  _withSpurs(_ring9, 1, 4),
 
-  // Level 11: 10 stations - circles {0,3,6,9}, triangles {1,4,7}, squares {2,5,8}.
-  // Spine 0..9 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring10, 0), maxLines: 4),
+  // Level 11: ring10, phase 0, +4 spurs.
+  _withSpurs(_ring10, 0, 4),
 
-  // Level 12: 10 stations - triangles {0,3,6,9}, squares {1,4,7}, circles {2,5,8}.
-  // Spine 0..9 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring10, 1), maxLines: 4),
+  // Level 12: ring10, phase 1, +5 spurs.
+  _withSpurs(_ring10, 1, 5),
 
-  // Level 13: 11 stations - circles {0,3,6,9}, triangles {1,4,7,10}, squares {2,5,8}.
-  // Spine 0..10 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring11, 0), maxLines: 4),
+  // Level 13: ring11, phase 0, +5 spurs.
+  _withSpurs(_ring11, 0, 5),
 
-  // Level 14: 11 stations - triangles {0,3,6,9}, squares {1,4,7,10}, circles {2,5,8}.
-  // Spine 0..10 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring11, 1), maxLines: 4),
+  // Level 14: ring11, phase 1, +6 spurs.
+  _withSpurs(_ring11, 1, 6),
 
-  // Level 15: 12 stations - circles {0,3,6,9}, triangles {1,4,7,10}, squares {2,5,8,11}.
-  // Spine 0..11 solves it with 1 of 4 lines.
-  _LevelData(stations: _ring(_ring12, 0), maxLines: 4),
+  // Level 15: ring12, phase 0, +6 spurs — the busiest network, 18 stations
+  // and 7 line slots.
+  _withSpurs(_ring12, 0, 6),
 ];
 
 class TransitPlannerScreen extends StatefulWidget {
@@ -259,6 +322,7 @@ class TransitPlannerScreen extends StatefulWidget {
 class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
   late _LevelData _data;
   late List<List<int>> _lines;
+  late Map<int, List<int>> _adjacency;
   int _activeLine = 0;
   int? _dragCursor;
   bool _completed = false;
@@ -267,10 +331,37 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
   @override
   void initState() {
     super.initState();
+    _setupLevel();
+  }
+
+  /// Builds this level's station/edge/line-slot state from scratch — shared
+  /// by [initState] and [_restartLevel] so there's one place that defines
+  /// "a fresh attempt at this level" (does not touch [widget.ctx.level],
+  /// so it always rebuilds the same level, never a new random one).
+  void _setupLevel() {
     final index = (widget.ctx.level - 1).clamp(0, _levels.length - 1);
     _data = _levels[index];
     _lines = List.generate(_data.maxLines, (_) => <int>[]);
+    _adjacency = {};
+    for (final edge in _data.edges) {
+      _adjacency.putIfAbsent(edge[0], () => []).add(edge[1]);
+      _adjacency.putIfAbsent(edge[1], () => []).add(edge[0]);
+    }
+    _activeLine = 0;
+    _dragCursor = null;
+    _completed = false;
+    _flashSuccess = false;
   }
+
+  /// Same-level restart: clears every drawn line and re-selects line 1,
+  /// without leaving the screen or touching progress — distinct from
+  /// `gameActions()`'s "Reset progress" (wipes all levels' stars).
+  void _restartLevel() {
+    Sfx.tap();
+    setState(_setupLevel);
+  }
+
+  bool _connected(int a, int b) => _adjacency[a]?.contains(b) ?? false;
 
   int? _stationAt(Offset local, double size) {
     const hitRadius = 0.07;
@@ -323,7 +414,15 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
       _afterEdit();
       return;
     }
-    if (line.isEmpty || idx != line.last) {
+    // A line can only extend along a legal track connection (see
+    // [_LevelData.edges]), and can never revisit a station it's already
+    // touched — that's what stops the old "one line snakes through
+    // everything" trick from trivializing a level that has spurs. Both
+    // checks silently ignore the gesture rather than erroring, same as the
+    // existing "off the line's end" ignore above.
+    if ((line.isEmpty || idx != line.last) &&
+        !line.contains(idx) &&
+        (line.isEmpty || _connected(line.last, idx))) {
       setState(() => line.add(idx));
       _dragCursor = idx;
       _afterEdit();
@@ -334,11 +433,13 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
     _dragCursor = null;
   }
 
-  /// Reveals one step of the always-valid "spine" solution proved in the
-  /// class doc above [_LevelData]: connecting stations 0 -> 1 -> ... ->
-  /// (n-1) on a single line always solves any level here. Finds how far
-  /// the active line currently reaches and suggests the next station in
-  /// that spine.
+  /// Finds the first station no line has touched yet and points at a legal
+  /// edge that reaches it from wherever the player has already drawn —
+  /// works uniformly for both the plain-ring spine and any spur, since
+  /// both are just "an untouched station with an edge back to a touched
+  /// one" from the solver's point of view. Once everything is touched, the
+  /// remaining work is the connectivity condition, which doesn't reduce to
+  /// a single next-move, so that case gets a general nudge instead.
   void _showHint() {
     if (_completed) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -346,25 +447,55 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
       );
       return;
     }
-    final line = _lines[_activeLine];
+    final touched = <int>{for (final line in _lines) ...line};
     final n = _data.stations.length;
-    final nextIndex = line.isEmpty ? 0 : line.last + 1;
-    if (nextIndex >= n) {
+    final untouched = [
+      for (var i = 0; i < n; i++)
+        if (!touched.contains(i)) i,
+    ];
+    if (untouched.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            'Line ${_activeLine + 1} already reaches the end of the loop — '
-            'check whether every station is covered by some line.',
+            'Every station is covered — now make sure lines that share a '
+            'station actually link up, so every matching shape can reach '
+            'the others.',
           ),
         ),
       );
       return;
     }
-    final verb = line.isEmpty ? 'Start' : 'Extend';
+    final target = untouched.first;
+    final reachableNeighbor = (_adjacency[target] ?? const [])
+        .where(touched.contains)
+        .firstOrNull;
+    if (reachableNeighbor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Start a new line at station ${target + 1} and extend it along '
+            'the track from there.',
+          ),
+        ),
+      );
+      return;
+    }
+    final activeLine = _lines[_activeLine];
+    if (activeLine.isNotEmpty && activeLine.last == reachableNeighbor) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Extend Line ${_activeLine + 1} to station ${target + 1}.',
+          ),
+        ),
+      );
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$verb Line ${_activeLine + 1} toward station ${nextIndex + 1}.',
+          'Switch to a line ending at station ${reachableNeighbor + 1}, '
+          'then extend it to station ${target + 1}.',
         ),
       ),
     );
@@ -445,10 +576,12 @@ class _TransitPlannerScreenState extends State<TransitPlannerScreen> {
             def: transitPlannerDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restartLevel,
           ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.exit_to_app_rounded),
+            tooltip: 'Give up',
             onPressed: widget.ctx.onExit,
-            child: const Text('Give up'),
           ),
         ],
       ),
@@ -594,6 +727,23 @@ class _TransitPainter extends CustomPainter {
 
     Offset px(Offset normalized) =>
         Offset(normalized.dx * size.width, normalized.dy * size.height);
+
+    // The underlying track network: every legal connection a line could be
+    // drawn along, faint and underneath everything else. Since a line can
+    // now only extend along one of these (see `_onPanUpdate`), showing
+    // them is what tells the player which stations a spur even belongs
+    // to, instead of leaving them to guess.
+    final trackPaint = Paint()
+      ..color = AppTheme.textSecondary.withValues(alpha: 0.35)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (final edge in data.edges) {
+      canvas.drawLine(
+        px(data.stations[edge[0]].pos),
+        px(data.stations[edge[1]].pos),
+        trackPaint,
+      );
+    }
 
     // Drawn lines, underneath the station shapes.
     for (var i = 0; i < lines.length; i++) {

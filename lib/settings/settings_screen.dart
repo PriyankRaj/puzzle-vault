@@ -149,7 +149,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: AppTheme.textSecondary,
@@ -198,14 +198,14 @@ class _SettingsTile extends StatelessWidget {
                         title,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
-                          fontSize: 15,
+                          fontSize: 16,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: AppTheme.textSecondary,
                         ),
                       ),

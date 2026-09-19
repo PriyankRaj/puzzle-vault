@@ -7,6 +7,7 @@ import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
 import '../../core/progress_store.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 import '../../core/widgets/swipe_area.dart';
 
@@ -89,8 +90,25 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
   @override
   void initState() {
     super.initState();
+    _startNewGame();
+  }
+
+  /// Clears the board back to its just-started state (two freshly spawned
+  /// tiles, score reset). Shared by [initState] and the "Restart level"
+  /// action so there's one place that defines "a fresh game" — this game
+  /// is endless, so restarting never touches the persisted best score.
+  void _startNewGame() {
+    _tiles.clear();
+    _score = 0;
+    _gameOver = false;
+    _animating = false;
     _spawnTile();
     _spawnTile();
+  }
+
+  void _restart() {
+    Sfx.tap();
+    setState(_startNewGame);
   }
 
   List<Point<int>> _emptyCells() {
@@ -340,8 +358,8 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
 
   Color _tileColor(int value) {
     final colors = {
-      2: Color(0xFF3A4166),
-      4: Color(0xFF4A5285),
+      2: Color(0xFF4B5580),
+      4: Color(0xFF6C4FCB),
       8: Color(0xFFF5A623),
       16: Color(0xFFF08A24),
       32: Color(0xFFEB6F28),
@@ -367,6 +385,7 @@ class _Merge2048ScreenState extends State<Merge2048Screen> {
             def: merge2048Definition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _restart,
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -497,7 +516,7 @@ class _MergeTileView extends StatelessWidget {
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w800,
-              color: value >= 8 ? Colors.white : AppTheme.textPrimary,
+              color: Colors.white,
             ),
           ),
         ),

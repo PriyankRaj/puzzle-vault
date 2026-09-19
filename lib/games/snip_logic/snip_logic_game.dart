@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/settings_store.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 
 /// Original physics puzzle: a "parcel" (a plain colored orb) hangs from 1-3
@@ -387,6 +388,18 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
     _failed = false;
   }
 
+  /// Manual same-level restart, distinct from [_showFailedDialog]'s Retry:
+  /// reachable at any time (not just after a loss), and stays on screen
+  /// instead of showing a dialog. Still counts toward [_retryCount] so a
+  /// player can't dodge the star grading by resetting instead of losing.
+  void _restartLevel() {
+    Sfx.tap();
+    setState(() {
+      _retryCount++;
+      _resetSimulation();
+    });
+  }
+
   // --- Simulation ----------------------------------------------------
 
   void _onTick(Duration elapsed) {
@@ -623,6 +636,7 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
       }
     }
     if (bestIndex >= 0 && bestDist <= _cutThreshold) {
+      Sfx.tap();
       setState(() {
         _ropeCut[bestIndex] = true;
       });
@@ -695,6 +709,7 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
             def: snipLogicDefinition,
             ctx: widget.ctx,
             onHint: (_completed || _failed) ? null : _showHint,
+            onRestart: _restartLevel,
           ),
           TextButton(onPressed: widget.ctx.onExit, child: const Text('Menu')),
         ],
@@ -704,24 +719,31 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Retries: $_retryCount',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Retries: $_retryCount',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    color: _completed
-                        ? AppTheme.success
-                        : _failed
-                        ? AppTheme.danger
-                        : AppTheme.textSecondary,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _completed
+                          ? AppTheme.success
+                          : _failed
+                          ? AppTheme.danger
+                          : AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -758,9 +780,11 @@ class _SnipLogicScreenState extends State<SnipLogicScreen>
                                 scale: scale,
                                 spec: _spec,
                                 parcelPos: _parcelPos,
+                                parcelVel: _parcelVel,
                                 ropeCut: _ropeCut,
                                 simTime: _simTime,
                                 pulse: _pulseController.value,
+                                completed: _completed,
                               ),
                             );
                           },
@@ -783,17 +807,21 @@ class _SnipLogicPainter extends CustomPainter {
     required this.scale,
     required this.spec,
     required this.parcelPos,
+    required this.parcelVel,
     required this.ropeCut,
     required this.simTime,
     required this.pulse,
+    required this.completed,
   });
 
   final double scale;
   final _LevelSpec spec;
   final Offset parcelPos;
+  final Offset parcelVel;
   final List<bool> ropeCut;
   final double simTime;
   final double pulse;
+  final bool completed;
 
   static const double _parcelRadius = 14;
 
@@ -821,7 +849,7 @@ class _SnipLogicPainter extends CustomPainter {
       );
     }
 
-    // Hazard.
+    // Hazard — a spiky, scowling saw-block instead of a plain red bar.
     final hazard = spec.hazard;
     if (hazard != null) {
       final rect = hazard.rectAt(simTime);
@@ -837,9 +865,11 @@ class _SnipLogicPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5,
       );
+      _drawSpikes(canvas, rect);
+      _drawAngryFace(canvas, rect.center, rect.shortestSide * 0.32);
     }
 
-    // Target zone (pulsing).
+    // Target zone (pulsing, friendly "landing nest" face).
     final pulseAlpha = 0.30 + 0.25 * pulse;
     canvas.drawCircle(
       spec.targetCenter,
@@ -854,6 +884,7 @@ class _SnipLogicPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
+    _drawTargetFace(canvas, spec.targetCenter, spec.targetRadius);
 
     // Ropes + anchors.
     final ropePaint = Paint()
@@ -869,7 +900,7 @@ class _SnipLogicPainter extends CustomPainter {
       }
     }
 
-    // Parcel.
+    // Parcel — a little critter with a face that reacts to how it's doing.
     canvas.drawCircle(
       parcelPos,
       _parcelRadius,
@@ -890,8 +921,142 @@ class _SnipLogicPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
+    _drawParcelFace(canvas);
 
     canvas.restore();
+  }
+
+  /// A dinky sawtooth ridge along the hazard's top and bottom edges, so it
+  /// reads as a spiky danger block rather than a plain rounded bar.
+  void _drawSpikes(Canvas canvas, Rect rect) {
+    final paint = Paint()..color = AppTheme.danger;
+    const spikeW = 8.0;
+    for (final onTop in [true, false]) {
+      final baseY = onTop ? rect.top : rect.bottom;
+      final tipY = onTop ? rect.top - 5 : rect.bottom + 5;
+      var x = rect.left + 4;
+      while (x < rect.right - 4) {
+        final path = Path()
+          ..moveTo(x, baseY)
+          ..lineTo(x + spikeW / 2, tipY)
+          ..lineTo(x + spikeW, baseY)
+          ..close();
+        canvas.drawPath(path, paint);
+        x += spikeW;
+      }
+    }
+  }
+
+  /// Angled brows + narrowed eyes — a simple scowl, no mouth needed to read
+  /// as "stay away from me".
+  void _drawAngryFace(Canvas canvas, Offset center, double eyeSpacing) {
+    final white = Paint()..color = Colors.white;
+    final pupil = Paint()..color = Colors.black;
+    final brow = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (final side in [-1.0, 1.0]) {
+      final eye = center + Offset(side * eyeSpacing, 0);
+      canvas.drawOval(
+        Rect.fromCenter(center: eye, width: 7, height: 5),
+        white,
+      );
+      canvas.drawCircle(eye + const Offset(0, 0.5), 2, pupil);
+      canvas.drawLine(
+        eye + Offset(-side * 4, -5),
+        eye + Offset(side * 4, -1.5),
+        brow,
+      );
+    }
+  }
+
+  /// A calm, welcoming smiley baked into the pulsing landing zone.
+  void _drawTargetFace(Canvas canvas, Offset center, double radius) {
+    final stroke = Paint()
+      ..color = AppTheme.success
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final eyeSpacing = radius * 0.4;
+    final eyeY = center.dy - radius * 0.18;
+    canvas.drawCircle(
+      Offset(center.dx - eyeSpacing, eyeY),
+      radius * 0.09,
+      Paint()..color = AppTheme.success,
+    );
+    canvas.drawCircle(
+      Offset(center.dx + eyeSpacing, eyeY),
+      radius * 0.09,
+      Paint()..color = AppTheme.success,
+    );
+    final smileRect = Rect.fromCenter(
+      center: Offset(center.dx, center.dy + radius * 0.05),
+      width: radius * 0.9,
+      height: radius * 0.7,
+    );
+    canvas.drawArc(smileRect, 0.25, pi - 0.5, false, stroke);
+  }
+
+  /// Eyes track the direction of travel; the mouth switches between calm
+  /// (resting, all ropes intact), worried (moving fast), happy (settled in
+  /// the target), and a plain neutral line otherwise.
+  void _drawParcelFace(Canvas canvas) {
+    final speed = parcelVel.distance;
+    final atRest = !ropeCut.contains(true);
+    final white = Paint()..color = Colors.white;
+    final dark = Paint()..color = Colors.black.withValues(alpha: 0.85);
+
+    final dir = speed > 20 ? parcelVel / speed : const Offset(0, 1);
+    final lookX = (dir.dx * 2.2).clamp(-2.5, 2.5);
+    final lookY = (dir.dy * 2.2).clamp(-2.5, 2.5);
+    final eyeBase = parcelPos + const Offset(0, -3);
+    for (final side in [-1.0, 1.0]) {
+      final eye = eyeBase + Offset(side * 5, 0);
+      canvas.drawCircle(eye, 3.2, white);
+      canvas.drawCircle(eye + Offset(lookX, lookY), 1.5, dark);
+    }
+
+    final mouthCenter = parcelPos + const Offset(0, 6);
+    if (completed) {
+      canvas.drawArc(
+        Rect.fromCenter(center: mouthCenter, width: 10, height: 8),
+        0.15,
+        pi - 0.3,
+        false,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.85)
+          ..strokeWidth = 1.6
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    } else if (speed > 240) {
+      canvas.drawOval(
+        Rect.fromCenter(center: mouthCenter, width: 6, height: 7),
+        dark,
+      );
+    } else if (atRest) {
+      canvas.drawLine(
+        mouthCenter + const Offset(-3, 0),
+        mouthCenter + const Offset(3, 0),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.7)
+          ..strokeWidth = 1.5
+          ..strokeCap = StrokeCap.round,
+      );
+    } else {
+      canvas.drawArc(
+        Rect.fromCenter(center: mouthCenter, width: 7, height: 5),
+        0.3,
+        pi - 0.6,
+        false,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.7)
+          ..strokeWidth = 1.4
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
   @override

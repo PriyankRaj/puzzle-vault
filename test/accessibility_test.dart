@@ -8,6 +8,7 @@ import 'package:topgames/app/theme.dart';
 import 'package:topgames/core/game_definition.dart';
 import 'package:topgames/core/progress_store.dart';
 import 'package:topgames/core/settings_store.dart';
+import 'package:topgames/core/widgets/game_host.dart';
 import 'package:topgames/core/widgets/level_select_screen.dart';
 import 'package:topgames/games/registry.dart';
 import 'package:topgames/home/home_screen.dart';
@@ -80,6 +81,35 @@ void main() {
 
         await tester.pumpWidget(wrap(const HomeScreen()));
         await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  group('game screens do not overflow at a narrow phone width', () {
+    // A physically-narrow real device (320 logical px, the same width
+    // used above for the home grid) is much tighter than the ~800x600
+    // default widget-test viewport every per-game logic test uses, so a
+    // status-row/AppBar overflow that only shows up this narrow went
+    // uncaught until it surfaced on a real emulator. Boots every
+    // registered game's actual gameplay screen (not just the home grid)
+    // at that width for a few frames, same as game_smoke_test.dart but at
+    // a real device width instead of the default wide viewport.
+    for (final def in gameRegistry) {
+      testWidgets('${def.id} at width 320 logical px', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 720));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light(),
+            home: GameHost(def: def, initialLevel: 1),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 100));
+
         expect(tester.takeException(), isNull);
       });
     }

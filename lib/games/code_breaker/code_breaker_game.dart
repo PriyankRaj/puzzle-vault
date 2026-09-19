@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/game_definition.dart';
 import '../../core/game_level_context.dart';
 import '../../core/motion.dart';
+import '../../core/sound.dart';
 import '../../core/widgets/game_actions.dart';
 import '../../core/widgets/result_dialog.dart';
 
@@ -111,7 +112,10 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
     _failed = false;
   }
 
-  void _retry() => setState(_startLevel);
+  void _retry() {
+    Sfx.tap();
+    setState(_startLevel);
+  }
 
   void _pickColor(int colorIndex) {
     if (_failed) return;
@@ -215,43 +219,92 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: c.color, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: c.color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: c.color.withValues(alpha: 0.45),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       alignment: Alignment.center,
       child: Icon(c.icon, size: size * 0.55, color: Colors.white),
     );
   }
 
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: AppTheme.textSecondary,
+        ),
+      ),
+    );
+  }
+
   Widget _buildCurrentGuessRow() {
+    // The next empty slot gets a bold, dashed-look accent ring so it's
+    // obvious at a glance where the next palette tap will land, instead of
+    // every empty slot looking identically inert.
+    final nextSlot = _current.indexWhere((c) => c == null);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (var i = 0; i < _pegCount; i++)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: GestureDetector(
-              key: ValueKey('slot_$i'),
-              onTap: () => _clearSlot(i),
-              child: AnimatedContainer(
-                duration: Motion.ms(150),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _current[i] == null
-                      ? AppTheme.surfaceHigh
-                      : _palette[_current[i]!].color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppTheme.accent.withValues(alpha: 0.5),
+            child: Semantics(
+              button: true,
+              label: _current[i] == null
+                  ? 'Guess slot ${i + 1}, empty'
+                  : 'Guess slot ${i + 1}, ${_palette[_current[i]!].name}, tap to clear',
+              child: GestureDetector(
+                key: ValueKey('slot_$i'),
+                onTap: () => _clearSlot(i),
+                child: AnimatedContainer(
+                  duration: Motion.ms(150),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _current[i] == null
+                        ? AppTheme.surfaceHigh
+                        : _palette[_current[i]!].color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: i == nextSlot
+                          ? AppTheme.accent
+                          : AppTheme.accent.withValues(alpha: 0.35),
+                      width: i == nextSlot ? 3 : 1.5,
+                    ),
+                    boxShadow: _current[i] == null
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: _palette[_current[i]!].color.withValues(
+                                alpha: 0.4,
+                              ),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                   ),
+                  alignment: Alignment.center,
+                  child: _current[i] == null
+                      ? null
+                      : Icon(
+                          _palette[_current[i]!].icon,
+                          size: 26,
+                          color: Colors.white,
+                        ),
                 ),
-                alignment: Alignment.center,
-                child: _current[i] == null
-                    ? null
-                    : Icon(
-                        _palette[_current[i]!].icon,
-                        size: 22,
-                        color: Colors.white,
-                      ),
               ),
             ),
           ),
@@ -262,30 +315,58 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
   Widget _buildPalette() {
     return Wrap(
       alignment: WrapAlignment.center,
-      spacing: 12,
-      runSpacing: 12,
+      spacing: 14,
+      runSpacing: 14,
       children: [
         for (var i = 0; i < _colorCount; i++)
           Semantics(
             button: true,
-            label: _palette[i].name,
-            child: GestureDetector(
+            label: 'Pick ${_palette[i].name}',
+            child: InkWell(
               key: ValueKey('palette_$i'),
               onTap: () => _pickColor(i),
-              child: _peg(_palette[i], size: 48),
+              customBorder: const CircleBorder(),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: _peg(_palette[i], size: 52),
+              ),
             ),
           ),
       ],
     );
   }
 
-  Widget _feedbackDot(bool filled) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1.5),
-      child: Icon(
-        filled ? Icons.circle : Icons.circle_outlined,
-        size: 11,
-        color: filled ? AppTheme.textPrimary : AppTheme.textSecondary,
+  /// A labeled score chip instead of a bare row of tiny dots — "2 exact"
+  /// and "1 close" are spelled out so the feedback is legible at a glance
+  /// rather than requiring the player to count near-invisible pips.
+  Widget _scoreChip({
+    required IconData icon,
+    required int count,
+    required String label,
+    required Color color,
+  }) {
+    if (count == 0) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$count $label',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -293,40 +374,71 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
   Widget _buildHistory() {
     if (_history.isEmpty) {
       return Center(
-        child: Text(
-          'Your guesses will appear here',
-          style: TextStyle(color: AppTheme.textSecondary),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.history_rounded,
+              size: 36,
+              color: AppTheme.textSecondary,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your guesses will appear here',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            ),
+          ],
         ),
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: _history.length,
       itemBuilder: (context, index) {
         final attemptNumber = _history.length - index;
         final entry = _history[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Row(
             children: [
-              SizedBox(
-                width: 22,
+              CircleAvatar(
+                radius: 13,
+                backgroundColor: AppTheme.surfaceHigh,
                 child: Text(
                   '$attemptNumber',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               for (final colorIndex in entry.guess)
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
-                  child: _peg(_palette[colorIndex], size: 30),
+                  child: _peg(_palette[colorIndex], size: 32),
                 ),
               const Spacer(),
               Wrap(
                 children: [
-                  for (var i = 0; i < entry.exact; i++) _feedbackDot(true),
-                  for (var i = 0; i < entry.colorOnly; i++) _feedbackDot(false),
+                  _scoreChip(
+                    icon: Icons.check_circle_rounded,
+                    count: entry.exact,
+                    label: 'exact',
+                    color: AppTheme.success,
+                  ),
+                  _scoreChip(
+                    icon: Icons.swap_horiz_rounded,
+                    count: entry.colorOnly,
+                    label: 'close',
+                    color: AppTheme.warning,
+                  ),
                 ],
               ),
             ],
@@ -347,6 +459,7 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
             def: codeBreakerDefinition,
             ctx: widget.ctx,
             onHint: _showHint,
+            onRestart: _retry,
           ),
         ],
       ),
@@ -355,33 +468,128 @@ class _CodeBreakerScreenState extends State<CodeBreakerScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Guesses left: $_guessesLeft',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (_guessesLeft <= 3
+                              ? AppTheme.danger
+                              : AppTheme.accent)
+                          .withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Guesses left: $_guessesLeft',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: _guessesLeft <= 3
+                            ? AppTheme.danger
+                            : AppTheme.accent,
+                      ),
+                    ),
+                  ),
                 ),
-                Text(
-                  '$_colorCount colors',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    '$_colorCount colors · $_pegCount pegs',
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          _buildCurrentGuessRow(),
           const SizedBox(height: 16),
-          _buildPalette(),
-          const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: ElevatedButton(
-              key: const ValueKey('submit_guess'),
-              onPressed: _guessReady && !_failed ? _submit : null,
-              child: const Text('Submit guess'),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _sectionLabel('Your guess'),
             ),
           ),
-          const Divider(height: 24),
+          _buildCurrentGuessRow(),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _sectionLabel('Palette'),
+            ),
+          ),
+          _buildPalette(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                key: const ValueKey('submit_guess'),
+                onPressed: _guessReady && !_failed ? _submit : null,
+                child: const Text('Submit guess'),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: AppTheme.success,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'exact = right color & spot',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.swap_horiz_rounded,
+                      size: 14,
+                      color: AppTheme.warning,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'close = right color, wrong spot',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 16),
           Expanded(child: _buildHistory()),
         ],
       ),

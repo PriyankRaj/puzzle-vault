@@ -78,6 +78,10 @@ class AppTheme {
             ),
       fontFamily: 'Roboto',
     );
+    final coloredText = base.textTheme.apply(
+      bodyColor: txt,
+      displayColor: txt,
+    );
     return base.copyWith(
       appBarTheme: AppBarTheme(
         backgroundColor: bg,
@@ -86,12 +90,36 @@ class AppTheme {
         foregroundColor: txt,
         titleTextStyle: TextStyle(
           color: txt,
-          fontSize: 20,
+          fontSize: 22,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
         ),
+        actionsIconTheme: const IconThemeData(size: 22),
       ),
-      textTheme: base.textTheme.apply(bodyColor: txt, displayColor: txt),
+      // Each game AppBar can carry up to 6 action icons (restart, hint, how
+      // to play, levels, reset, menu) — Material's default 48px minimum
+      // tap target per IconButton doesn't fit that many on a narrow real
+      // phone (320 logical px), so this shrinks the tap target rather than
+      // the icon glyph itself (kept readable via actionsIconTheme above).
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(36, 36),
+          padding: EdgeInsets.zero,
+        ),
+      ),
+      // Named sizes bumped above the Material3 defaults (titleMedium 16->18,
+      // titleLarge 22->24, headlineSmall 24->26) since these are what the
+      // games' level headers use, on top of the size fixes already applied
+      // to per-game explicit TextStyle(fontSize: ...) literals — the app
+      // was reading small everywhere, not just in a few spots. Only styles
+      // with a non-null base fontSize are touched; `.apply(fontSizeFactor:)`
+      // asserts if used on a null-fontSize style, which some defaults are.
+      textTheme: coloredText.copyWith(
+        titleMedium: coloredText.titleMedium?.copyWith(fontSize: 18),
+        titleLarge: coloredText.titleLarge?.copyWith(fontSize: 24),
+        headlineSmall: coloredText.headlineSmall?.copyWith(fontSize: 26),
+        bodyMedium: coloredText.bodyMedium?.copyWith(fontSize: 15),
+      ),
       cardTheme: CardThemeData(
         color: surf,
         elevation: 0,
