@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/theme.dart';
+import 'core/character_store.dart';
 import 'core/progress_store.dart';
 import 'core/settings_store.dart';
 import 'home/home_screen.dart';
@@ -17,6 +18,7 @@ Future<void> main() async {
   ]);
   await ProgressStore.instance.init();
   await AppSettingsStore.instance.init();
+  await CharacterStore.instance.init();
   runApp(const PuzzleVaultApp());
 }
 

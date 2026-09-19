@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
+import '../core/character_store.dart';
 import '../core/game_definition.dart';
 import '../core/progress_store.dart';
 import '../core/settings_store.dart';
 import '../core/sound.dart';
+import '../core/widgets/character_avatar.dart';
 import '../core/widgets/game_host.dart';
 import '../games/registry.dart';
 import '../settings/settings_screen.dart';
+import 'character_customize_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -37,36 +40,44 @@ class HomeScreen extends StatelessWidget {
           ),
           body: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // 2-up on a phone; more columns (not just bigger cards) on
-                // wider/tablet screens.
-                final crossAxisCount = (constraints.maxWidth / 190)
-                    .floor()
-                    .clamp(2, 5);
-                return GridView.builder(
-                  itemCount: gameRegistry.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    // 0.78, not the pre-progress-badge 0.92: the icon +
-                    // progress badge + title + 2-line tagline need real
-                    // device testing to fit, not just a synthetic-viewport
-                    // widget test — this ratio was verified on an actual
-                    // Android emulator at normal text scale, not just in a
-                    // widget test's default 800x600 viewport (which never
-                    // exercises this device's real 3-up column width).
-                    // Also grows taller under larger system text sizes.
-                    childAspectRatio: textScaleAdjustedAspectRatio(
-                      context,
-                      0.74,
-                    ),
+            child: Column(
+              children: [
+                const _CharacterBanner(),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // 2-up on a phone; more columns (not just bigger
+                      // cards) on wider/tablet screens.
+                      final crossAxisCount = (constraints.maxWidth / 190)
+                          .floor()
+                          .clamp(2, 5);
+                      return GridView.builder(
+                        itemCount: gameRegistry.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          // 0.78, not the pre-progress-badge 0.92: the icon +
+                          // progress badge + title + 2-line tagline need real
+                          // device testing to fit, not just a synthetic-viewport
+                          // widget test — this ratio was verified on an actual
+                          // Android emulator at normal text scale, not just in a
+                          // widget test's default 800x600 viewport (which never
+                          // exercises this device's real 3-up column width).
+                          // Also grows taller under larger system text sizes.
+                          childAspectRatio: textScaleAdjustedAspectRatio(
+                            context,
+                            0.74,
+                          ),
+                        ),
+                        itemBuilder: (context, index) =>
+                            _GameCard(def: gameRegistry[index]),
+                      );
+                    },
                   ),
-                  itemBuilder: (context, index) =>
-                      _GameCard(def: gameRegistry[index]),
-                );
-              },
+                ),
+              ],
             ),
           ),
         );
@@ -232,6 +243,81 @@ class _ProgressBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(progress.display, style: textStyle),
         ],
+      ),
+    );
+  }
+}
+
+/// A friendly greeting card above the game grid: the user's customizable
+/// mascot (see [CharacterStore]) plus their chosen name, tapping through to
+/// [CharacterCustomizeScreen]. Purely cosmetic — no gameplay tie-in.
+class _CharacterBanner extends StatelessWidget {
+  const _CharacterBanner();
+
+  void _open(BuildContext context) {
+    Sfx.tap();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CharacterCustomizeScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _open(context),
+        child: Semantics(
+          button: true,
+          label: 'Customize your buddy',
+          child: ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              child: Row(
+                children: [
+                  const CharacterBadge(size: 56),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ValueListenableBuilder<String>(
+                          valueListenable: CharacterStore.instance.name,
+                          builder: (context, name, _) {
+                            return Text(
+                              'Hey, $name!',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap to customize your buddy',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
