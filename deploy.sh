@@ -56,6 +56,26 @@ record_deploy() {
   fi
 }
 
+# Apple rejects any upload whose build number isn't strictly higher than one it has EVER seen
+# for this bundle ID — including builds from before this deploy pipeline existed, or from a
+# previous run that got far enough to register a build before failing. There's no reliable
+# local signal for this (Xcode's own auto-bump during export only sometimes catches it), so
+# ask App Store Connect directly. Echoes 0 (never blocks a deploy) if the lookup fails for any
+# reason — altool/fastlane will still give a clear error on an actual collision.
+ios_max_known_build() {
+  local bundle_id="$1"
+  local jwt app_id
+  jwt="$(xcrun altool --generate-jwt --api-key "$APP_STORE_CONNECT_KEY_ID" --api-issuer "$APP_STORE_CONNECT_ISSUER_ID" 2>&1 | tail -1)"
+  [[ -z "$jwt" ]] && { echo 0; return; }
+  app_id="$(curl -s -g -H "Authorization: Bearer $jwt" \
+    "https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]=$bundle_id&fields[apps]=bundleId" \
+    2>/dev/null | jq -r '.data[0].id // empty')"
+  [[ -z "$app_id" ]] && { echo 0; return; }
+  curl -s -g -H "Authorization: Bearer $jwt" \
+    "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=$app_id&limit=50&fields[builds]=version" \
+    2>/dev/null | jq -r '[.data[].attributes.version | tonumber] | max // 0'
+}
+
 TARGET="both"
 PROMPT=1
 AUTO_YES=0
@@ -70,6 +90,7 @@ FASTLANE_ARGS=()
 # ~/.appstoreconnect/private_keys/AuthKey_<key id>.p8 (altool finds it there automatically).
 APP_STORE_CONNECT_KEY_ID="9PZA66NX9Q"
 APP_STORE_CONNECT_ISSUER_ID="6dc856b0-c8b9-4763-9f74-65180d9e678b"
+IOS_BUNDLE_ID="com.katariya.topgames"
 BRANCH="$(git branch --show-current)"
 
 for arg in "$@"; do
@@ -200,6 +221,19 @@ deploy_ios() {
     echo "Missing ios/ExportOptions/ExportOptions.plist — iOS deploy skipped." >&2
     exit 1
   fi
+
+  local ios_known_max
+  ios_known_max="$(ios_max_known_build "$IOS_BUNDLE_ID")"
+  if [[ "$ios_known_max" =~ ^[0-9]+$ ]]; then
+    local current_build_number="${new_version##*+}"
+    if (( ios_known_max >= current_build_number )); then
+      local adjusted_build=$((ios_known_max + 1))
+      log "[iOS] App Store Connect already has build $ios_known_max for $IOS_BUNDLE_ID — bumping build number to $adjusted_build to avoid a collision."
+      new_version="${new_version%+*}+${adjusted_build}"
+      sed -i '' "s/^version: .*/version: ${new_version}/" pubspec.yaml
+    fi
+  fi
+
   log "[iOS] Building and exporting archive..."
   local log_file
   log_file="$(mktemp)"
