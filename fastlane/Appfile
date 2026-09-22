@@ -1,0 +1,7 @@
+# Android (Google Play)
+json_key_file("android/play-deploy-key.json")
+package_name("com.katariya.topgames")
+
+# iOS (App Store Connect) — binary upload itself goes through
+# `flutter build ipa` + xcodebuild (see ios lane), which uses the
+# Xcode-signed-in Apple ID on this machine. No API key needed here.

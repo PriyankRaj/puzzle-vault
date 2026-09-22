@@ -1,0 +1,49 @@
+default_platform(:android)
+
+ROOT = File.expand_path("..", __dir__)
+AAB_PATH = File.join(ROOT, "build/app/outputs/bundle/release/app-release.aab")
+
+platform :android do
+  desc "Build the release App Bundle and upload it to the Play Store"
+  lane :deploy do |options|
+    Dir.chdir(ROOT) do
+      sh("flutter", "build", "appbundle", "--release")
+    end
+
+    upload_to_play_store(
+      track: options[:track] || "production",
+      release_status: options[:validate_only] ? "draft" : (options[:release_status] || "completed"),
+      aab: AAB_PATH,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      validate_only: options[:validate_only] || false
+    )
+  end
+end
+
+platform :ios do
+  desc "Upload an already-built IPA to App Store Connect and submit it for review"
+  lane :deploy do |options|
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("APP_STORE_CONNECT_KEY_ID"),
+      issuer_id: ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"),
+      key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{ENV.fetch('APP_STORE_CONNECT_KEY_ID')}.p8")
+    )
+
+    # "Deploy" means get it in front of Apple for review — it does NOT mean auto-publish the
+    # moment Apple approves it (automatic_release: false). Going live is a separate, deliberate
+    # manual step in App Store Connect after approval.
+    upload_to_app_store(
+      api_key: api_key,
+      ipa: options[:ipa_path],
+      app_version: options[:app_version],
+      force: true,
+      skip_screenshots: true,
+      submit_for_review: true,
+      automatic_release: false,
+      release_notes: { "en-US" => options[:release_notes] || "Bug fixes and improvements." },
+      submission_information: { export_compliance_uses_encryption: false }
+    )
+  end
+end

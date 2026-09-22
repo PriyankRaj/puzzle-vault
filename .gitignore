@@ -46,3 +46,14 @@ app.*.map.json
 
 # Local Claude Code session state
 .claude/
+
+# Release signing secrets — never commit to a public repo
+android/key.properties
+android/play-deploy-key.json
+
+# fastlane's own run report — regenerated every run, no lasting value in git
+/fastlane/report.xml
+
+# Local deploy history (used by the deploy dashboard) — machine-local state
+.deploy-history.json
+.last-failure.json
