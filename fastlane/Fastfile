@@ -43,7 +43,12 @@ platform :ios do
       submit_for_review: true,
       automatic_release: false,
       release_notes: { "en-US" => options[:release_notes] || "Bug fixes and improvements." },
-      submission_information: { export_compliance_uses_encryption: false }
+      submission_information: { export_compliance_uses_encryption: false },
+      # precheck is fastlane's own optional pre-flight linter, not an Apple requirement — and
+      # its in-app-purchase check flatly doesn't work with API-key auth ("cannot check In-app
+      # purchases with the App Store Connect API Key"), which would otherwise hard-block every
+      # submission for an app with any IAP product on file. Real review still happens at Apple.
+      run_precheck_before_submit: false
     )
   end
 end

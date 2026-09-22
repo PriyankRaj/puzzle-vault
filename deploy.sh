@@ -234,6 +234,12 @@ deploy_ios() {
     fi
   fi
 
+  # Clear any .ipa left in the output dir from a previous/stale build first — otherwise if
+  # more than one ends up there, picking "the" .ipa afterward is ambiguous and can silently
+  # grab an old one (this is exactly what happened once: an old .ipa embedding a lower,
+  # already-used build number got uploaded instead of the one just built).
+  rm -f build/ios/ipa/*.ipa
+
   log "[iOS] Building and exporting archive..."
   local log_file
   log_file="$(mktemp)"
@@ -257,6 +263,22 @@ deploy_ios() {
   if [[ -z "$ipa_path" ]]; then
     echo "[iOS] No .ipa found in build/ios/ipa after build — nothing to upload." >&2
     exit 1
+  fi
+
+  # Ground truth check: Xcode's own export step can silently bump the embedded build number
+  # past what we asked for (it has its own, faster-propagating signal for "already used" than
+  # our App Store Connect API query above, which can lag a few minutes right after a recent
+  # upload). Read back what actually got built and resync our tracking to match, so the
+  # version we log/record/commit is never a guess that turns out wrong.
+  local ipa_info_plist actual_build
+  ipa_info_plist="$(mktemp)"
+  unzip -p "$ipa_path" "Payload/Runner.app/Info.plist" > "$ipa_info_plist" 2>/dev/null
+  actual_build="$(plutil -extract CFBundleVersion raw -o - "$ipa_info_plist" 2>/dev/null)"
+  rm -f "$ipa_info_plist"
+  if [[ -n "$actual_build" && "$actual_build" != "${new_version##*+}" ]]; then
+    log "[iOS] Built archive actually embeds build $actual_build (Xcode's own export-time check caught something ours didn't) — syncing local version tracking to match."
+    new_version="${new_version%+*}+${actual_build}"
+    sed -i '' "s/^version: .*/version: ${new_version}/" pubspec.yaml
   fi
 
   log "[iOS] Uploading $(basename "$ipa_path") and submitting for App Store review..."
