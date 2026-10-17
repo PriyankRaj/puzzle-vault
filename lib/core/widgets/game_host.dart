@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../game_definition.dart';
 import '../game_level_context.dart';
 import '../progress_store.dart';
+import '../review_prompter.dart';
 import '../settings_store.dart';
 import 'info_tip_button.dart';
 import 'level_select_screen.dart';
@@ -78,6 +80,7 @@ class _GameHostState extends State<GameHost> {
     }
 
     await ProgressStore.instance.setStars(def.id, _level, stars);
+    unawaited(ReviewPrompter.recordWin());
     final nextLevel = _level + 1;
     if (nextLevel <= def.levelCount) {
       await ProgressStore.instance.unlockUpTo(def.id, nextLevel);
